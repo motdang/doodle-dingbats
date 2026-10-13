@@ -1,0 +1,8 @@
+<!doctype html><meta charset="utf-8"><body style="font:20px/1.5 system-ui;padding:20px;color:#223;background:#fff">
+<p id="p1">Inline <doodle-dingbat name="heart"></doodle-dingbat> and data form <i data-dingbat="coffee" data-look="paper"></i> and a bad name <i data-dingbat="nope"></i>.</p>
+<p style="font-size:48px">Big <doodle-dingbat id="big" name="lantern" look="riso"></doodle-dingbat> <doodle-dingbat name="heart" look="neon" style="background:#123"></doodle-dingbat> <doodle-dingbat name="heart" look="mono"></doodle-dingbat></p>
+<div><doodle-dingbat name="vine" size="40px"></doodle-dingbat></div>
+<ul id="ul"><li>one</li><li>two</li><li>three</li></ul>
+<p><a href="#x" id="lnk">a link with <doodle-dingbat name="heart" id="inlink"></doodle-dingbat> inside</a></p>
+<script src="../dingbats.js"></script>
+<script>Dingbats.bullets(document.getElementById('ul'), ['heart','coffee']); window.addEventListener('hashchange',()=>document.title='followed');</script>

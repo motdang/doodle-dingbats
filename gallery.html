@@ -1,0 +1,309 @@
+<title>Doodle Dingbats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Gloock&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a type foundry's specimen sheet on drafting paper — the glyph case on the left, a proof of the chosen sort on the right. */
+:root {
+  --paper: #F1F4F2; --grid: #DCE4E1; --ink: #18213A; --soft: #4E5A6E; --line: #C3CDCA; --cell: #FAFBFA;
+  --pink: #E0237F; --pink-ink: #FFFFFF; --hi: #FFE14D; --night: #121729; --night-ink: #EEF0F7;
+  --display: 'Gloock', 'Georgia', 'Times New Roman', serif;
+  --body: 'Atkinson Hyperlegible', 'Verdana', 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', 'Menlo', 'Consolas', monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #141A2B; --grid: #1E2639; --ink: #EEF0F7; --soft: #A9B2C6; --line: #34405A; --cell: #19203A;
+  --pink: #FF5AA8; --pink-ink: #10131F; --hi: #FFE14D; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #141A2B; --grid: #1E2639; --ink: #EEF0F7; --soft: #A9B2C6; --line: #34405A; --cell: #19203A;
+  --pink: #FF5AA8; --pink-ink: #10131F; --hi: #FFE14D; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink); font: 17px/1.55 var(--body);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; padding: 0 16px 48px;
+}
+.wrap { max-width: 1320px; margin: 0 auto; }
+:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+
+header.top { padding-block: 40px 20px; display: grid; gap: 14px; }
+.eyebrow { font: 500 13px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--soft); }
+h1 { font: 400 clamp(44px, 8vw, 96px)/0.95 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.thesis { font: 400 clamp(22px, 3.2vw, 34px)/1.4 var(--display); max-width: 30ch; margin: 6px 0 0; text-wrap: balance; }
+.lede { max-width: 62ch; color: var(--soft); margin: 0; }
+.lede b { color: var(--ink); }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); border-block: 1.5px solid var(--ink);
+  padding-block: 10px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+@media (max-width: 700px) { .bar { position: static; } }
+.bar label, .bar .lab { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.field { display: flex; align-items: center; gap: 8px; }
+input[type="search"] { font: 17px var(--body); padding: 7px 10px; border: 1.5px solid var(--ink); background: var(--cell); color: var(--ink); border-radius: 3px; width: 13em; max-width: 100%; }
+.seg { display: inline-flex; border: 1.5px solid var(--ink); border-radius: 3px; overflow: hidden; }
+.seg button { font: 500 14px/1 var(--mono); padding: 8px 10px; border: 0; background: var(--cell); color: var(--ink); cursor: pointer; }
+.seg button + button { border-left: 1.5px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+input[type="range"] { width: 120px; accent-color: var(--pink); }
+input[type="color"] { width: 30px; height: 30px; padding: 0; border: 1.5px solid var(--ink); border-radius: 3px; background: none; cursor: pointer; }
+.btn { font: 700 15px/1 var(--body); padding: 9px 14px; border: 1.5px solid var(--ink); border-radius: 3px; background: var(--hi); color: #000; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+.btn.plain { background: var(--cell); color: var(--ink); }
+
+.fams { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 16px 4px; }
+.chip { font: 500 14px/1 var(--mono); padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 99px; background: var(--cell); color: var(--ink); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip span { color: var(--soft); }
+.chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.chip[aria-pressed="true"] span { color: var(--paper); opacity: .75; }
+
+main.sheet { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 28px; align-items: start; padding-top: 12px; }
+@media (max-width: 900px) { main.sheet { grid-template-columns: minmax(0, 1fr); } }
+
+.case { display: grid; gap: 28px; min-width: 0; }
+.drawer h2 { font: 400 30px/1.1 var(--display); margin: 0 0 4px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.drawer h2 small { font: 500 13px/1 var(--mono); color: var(--soft); letter-spacing: .04em; }
+.drawer p { margin: 0 0 12px; color: var(--soft); max-width: 62ch; }
+.cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--cw, 112px), 1fr)); border-top: 1.5px solid var(--ink); border-left: 1.5px solid var(--ink); }
+.cells.wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+.cell { position: relative; border: 0; border-right: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink); background: var(--cell); color: var(--ink);
+  padding: 14px 8px 8px; display: grid; justify-items: center; gap: 8px; cursor: pointer; font: inherit; text-align: center; min-width: 0; }
+.cell:hover { background: var(--paper); }
+.cell[aria-current="true"] { box-shadow: inset 0 0 0 3px var(--pink); }
+.cell .g { display: grid; place-items: center; height: calc(var(--gs, 56px) + 18px); width: 100%; }
+.cell .n { font: 500 13px/1.2 var(--mono); overflow-wrap: anywhere; }
+.cell .u { position: absolute; top: 5px; right: 6px; font: 400 11px/1 var(--mono); color: var(--soft); }
+.sheet.dark .cell, .sheet.dark .proof .stage { background: var(--night); color: var(--night-ink); }
+.sheet.dark .cell .u { color: #8C95AE; }
+.empty { padding: 24px; border: 1.5px dashed var(--line); color: var(--soft); }
+
+.proof { position: sticky; top: 76px; border: 1.5px solid var(--ink); background: var(--cell); display: grid; min-width: 0; max-height: calc(100vh - 92px); overflow: auto; }
+@media (max-width: 900px) { .proof { position: static; max-height: none; order: -1; } }
+.proof .stage { display: grid; place-items: center; min-height: 250px; padding: 30px 16px; border-bottom: 1.5px solid var(--ink); background: var(--paper); overflow: hidden; }
+.proof .stage.wide { min-height: 170px; }
+.proof .body { padding: 16px 18px 20px; display: grid; gap: 14px; }
+.proof h3 { font: 400 34px/1 var(--display); margin: 0; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.proof h3 small { font: 500 13px/1 var(--mono); color: var(--soft); }
+.proof dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.proof dt { font: 500 12px/1.6 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--soft); }
+.proof dd { margin: 0; }
+.sizes { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; padding: 6px 0; }
+.sizes figure { margin: 0; display: grid; justify-items: center; gap: 4px; }
+.sizes figcaption { font: 400 11px/1 var(--mono); color: var(--soft); }
+.inline-demo { font-size: 19px; line-height: 1.6; margin: 0; padding: 10px 12px; background: var(--paper); border-left: 3px solid var(--pink); }
+.looks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1.5px solid var(--ink); }
+.looks > div { display: grid; justify-items: center; gap: 4px; padding: 10px 2px 6px; background: var(--cell); }
+.looks > div + div { border-left: 1.5px solid var(--ink); }
+.looks > div.neon { background: var(--night); color: var(--night-ink); }
+.looks span { font: 400 11px/1 var(--mono); color: inherit; opacity: .75; }
+pre { margin: 0; font: 13px/1.5 var(--mono); background: var(--paper); border: 1.5px solid var(--line); padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.note { font-size: 14px; color: var(--soft); margin: 0; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 3px; font: 700 15px var(--body); z-index: 9; }
+
+.uses { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); padding-block: 4px 30px; }
+.uses h2 { grid-column: 1 / -1; font: 400 30px/1.1 var(--display); margin: 0; }
+.use { border: 1.5px solid var(--ink); background: var(--cell); padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.use .k { font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.use p, .use ul { margin: 0; }
+.use ul { padding: 0; display: grid; gap: 4px; }
+.use .big { font: 400 26px/1.2 var(--display); }
+.use .heat { font-size: 22px; letter-spacing: -0.05em; }
+.use .status { display: flex; gap: 14px; align-items: center; font: 500 15px var(--mono); flex-wrap: wrap; }
+.use .rule { display: block; margin-top: 4px; }
+
+footer.use { margin-top: 48px; border-top: 1.5px solid var(--ink); padding-top: 22px; display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); }
+footer.use h2 { font: 400 28px/1.1 var(--display); margin: 0 0 8px; }
+footer.use p, footer.use li { color: var(--soft); max-width: 62ch; }
+footer.use code { font: 14px var(--mono); color: var(--ink); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--soft); }
+td code { white-space: nowrap; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">A specimen of moving sorts</div>
+    <h1>Doodle Dingbats</h1>
+    <p class="thesis">The tea is on <doodle-dingbat name="coffee"></doodle-dingbat>, the lanterns go up at dusk <doodle-dingbat name="lantern"></doodle-dingbat>, and a reply comes back with love <doodle-dingbat name="heart"></doodle-dingbat>.</p>
+    <p class="lede">Hand-drawn glyphs that sit in a line of text at the size of the words around them, move on their own, and do something particular when tapped. <b>Tap any of them.</b> One script, five looks, and the line takes the colour of the text.</p>
+  </header>
+
+  <section class="uses" aria-label="In use">
+    <h2>In use</h2>
+    <div class="use"><span class="k">A button</span><button class="btn" id="save-demo" type="button"><doodle-dingbat name="save" play="hover"></doodle-dingbat> Save the list</button><p class="note">The glyph wakes on hover; a click sends a spray of stars from the button.</p></div>
+    <div class="use"><span class="k">A list</span><ul id="list-demo"><li>Water the basil</li><li>Pick up the rice</li><li>Call the plumber</li></ul></div>
+    <div class="use"><span class="k">A heat scale</span><p class="big">Khao soi <doodle-dingbat name="khao-soi"></doodle-dingbat></p><p class="heat" aria-label="Heat: two of three"><doodle-dingbat name="chili" play="hover"></doodle-dingbat><doodle-dingbat name="chili" play="hover"></doodle-dingbat><doodle-dingbat name="chili" play="still" style="opacity:.3"></doodle-dingbat></p></div>
+    <div class="use"><span class="k">A status line</span><p class="status"><span><doodle-dingbat name="wifi"></doodle-dingbat> online</span><span><doodle-dingbat name="battery"></doodle-dingbat> charging</span><span><doodle-dingbat name="loading"></doodle-dingbat> finding places</span></p></div>
+    <div class="use"><span class="k">A note</span><p><doodle-dingbat name="bell"></doodle-dingbat> Three new messages from the market, and Yi Peng starts on the full moon <doodle-dingbat name="moon"></doodle-dingbat>.</p></div>
+    <div class="use"><span class="k">Between sections</span><p>The end of one part.</p><doodle-dingbat class="rule" name="tung" size="1.6em"></doodle-dingbat><p>The start of the next.</p></div>
+  </section>
+
+  <div class="bar" role="toolbar" aria-label="Specimen controls">
+    <div class="field"><label for="q">Find</label><input id="q" type="search" placeholder="rain, love, loading…" autocomplete="off"></div>
+    <div class="field"><span class="lab" id="look-l">Look</span><div class="seg" id="look" role="group" aria-labelledby="look-l"></div></div>
+    <div class="field"><label for="sz">Size</label><input id="sz" type="range" min="24" max="112" value="56"></div>
+    <div class="field"><span class="lab" id="play-l">Play</span><div class="seg" id="play" role="group" aria-labelledby="play-l"></div></div>
+    <div class="field"><span class="lab">Colours</span><input id="ca" type="color" value="#F2B134" aria-label="Accent a"><input id="cb" type="color" value="#EF5B5B" aria-label="Accent b"><input id="cc" type="color" value="#2EA8A0" aria-label="Accent c"></div>
+    <button class="btn" id="rain" type="button">Shower</button>
+  </div>
+
+  <nav class="fams" id="fams" aria-label="Families"></nav>
+
+  <main class="sheet" id="sheet">
+    <div class="case" id="case"></div>
+    <aside class="proof" id="proof" aria-live="polite"></aside>
+  </main>
+
+  <footer class="use">
+    <section>
+      <h2>On a page</h2>
+      <pre>&lt;script src="dingbats.min.js"&gt;&lt;/script&gt;
+
+&lt;p&gt;Saved &lt;doodle-dingbat name="check"&gt;&lt;/doodle-dingbat&gt;&lt;/p&gt;
+&lt;i data-dingbat="lantern" data-look="paper"&gt;&lt;/i&gt;</pre>
+      <p>Either form works; the second survives editors that strip unknown tags. Without a <code>size</code> it is 1em, so it follows the text. Without a <code>label</code> a screen reader skips it as decoration.</p>
+    </section>
+    <section>
+      <h2>Attributes</h2>
+      <div class="tbl"><table>
+        <thead><tr><th>Name</th><th>Takes</th></tr></thead>
+        <tbody>
+          <tr><td><code>name</code></td><td>any glyph on this sheet</td></tr>
+          <tr><td><code>look</code></td><td>ink · paper · riso · neon · mono</td></tr>
+          <tr><td><code>play</code></td><td>loop · hover · once · still</td></tr>
+          <tr><td><code>size</code></td><td>any CSS length</td></tr>
+          <tr><td><code>a b c skin</code></td><td>colours; or <code>--db-a</code> … in CSS</td></tr>
+          <tr><td><code>weight speed label</code></td><td>line weight, tempo, words for a screen reader</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+    <section>
+      <h2>In code</h2>
+      <pre>Dingbats.burst(button, { names: ['star', 'heart'] })
+Dingbats.bullets(ul, ['leaf', 'sprout'])
+Dingbats.favicon('lantern')
+Dingbats.draw(ctx, 'koi', { x, y, size: 48, t })
+Dingbats.svgLoop('rainbow')   // an animated SVG string</pre>
+      <p>Readers who turn motion off see each glyph at rest; a tap still shows its result.</p>
+    </section>
+  </footer>
+</div>
+
+<script src="dingbats.min.js"></script>
+<script>
+(function () {
+'use strict';
+var D = window.Dingbats;
+var UNI = { heart: '❤', star: '★', sparkle: '✦', check: '✓', cross: '✗', asterisk: '✱', manicule: '☞', scissors: '✂', pencil: '✎', nib: '✒', envelope: '✉', telephone: '☎', airplane: '✈', snowflake: '❄', sun: '☀', umbrella: '☂', flower: '✿', arrow: '➜', hedera: '❧', asterism: '⁂', pilcrow: '¶', interrobang: '‽', anchor: '⚓', crown: '♛', note: '♪', hourglass: '⌛', lightning: '⚡', cloud: '☁', moon: '☾', comet: '☄', coffee: '☕', gear: '⚙', warning: '⚠', fist: '✊', peace: '✌', 'point-up': '☝', smile: '☺', skull: '☠', fleuron: '❦', ellipsis: '…', dice: '⚀', atom: '⚛', search: '⌕', home: '⌂', 'thumbs-up': '👍', wai: '🙏' };   // stylecheck: allow — these are glyph names
+var FAMS = { classic: ['Classic', 'The printer’s dingbats, drawn by hand and set moving.'], signals: ['Signals', 'The small working glyphs of a screen: loading, sent, saved, found.'], faces: ['Faces & hands', 'Feelings and gestures. Hands take the skin colour you set.'],
+  nature: ['Nature', 'Weather, sky, water, plants and animals.'], lanna: ['Lanna', 'Chiang Mai and the north: lanterns, nagas, sticky rice, the street.'], kitchen: ['Kitchen', 'Cups, bowls, pans and what is on them.'],
+  curious: ['Curious', 'Machines, instruments, puzzles and mathematics that move.'], ornament: ['Ornaments', 'Wide ones for the space between sections.'] };
+var LOOKS = ['ink', 'paper', 'riso', 'neon', 'mono'], PLAYS = ['loop', 'hover', 'still'];
+var st = { look: 'ink', play: 'loop', size: 56, fam: '', q: '', sel: 'lantern' };
+try { var saved = JSON.parse(localStorage.getItem('dd-gallery') || '{}'); ['look', 'play', 'size', 'fam'].forEach(function (k) { if (saved[k] != null) st[k] = saved[k]; }); } catch (e) {}
+function keep() { try { localStorage.setItem('dd-gallery', JSON.stringify({ look: st.look, play: st.play, size: st.size, fam: st.fam })); } catch (e) {} }
+var $ = function (s) { return document.querySelector(s); };
+function el(tag, attrs, kids) { var e = document.createElement(tag); Object.keys(attrs || {}).forEach(function (k) { if (k === 'text') e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]); }); (kids || []).forEach(function (c) { e.appendChild(c); }); return e; }
+function dingbat(name, o) { var e = el('doodle-dingbat', Object.assign({ name: name }, o || {})); return e; }
+function code(c) { return 'U+' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0'); }
+var toastT = 0;
+function toast(msg) { var t = $('.toast'); if (!t) { t = el('div', { class: 'toast', role: 'status' }); document.body.appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 1800); }
+function copy(text, msg) {
+  var done = function () { toast(msg); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback();
+  function fallback() { var ta = el('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) { toast('Select the text and copy it'); } ta.remove(); }
+}
+
+/* controls */
+function seg(id, list, key) {
+  var box = $('#' + id); box.innerHTML = '';
+  list.forEach(function (v) { var b = el('button', { type: 'button', 'aria-pressed': String(st[key] === v), text: v }); b.onclick = function () { st[key] = v; keep(); seg(id, list, key); apply(); }; box.appendChild(b); });
+}
+function chips() {
+  var box = $('#fams'); box.innerHTML = '';
+  var all = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(!st.fam) }, [document.createTextNode('All '), el('span', { text: String(D.names().length) })]);
+  all.onclick = function () { st.fam = ''; keep(); chips(); render(); }; box.appendChild(all);
+  D.families().forEach(function (f) {
+    var n = D.names(function (i) { return i.fam === f; }).length; if (!n) return;
+    var b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(st.fam === f) }, [dingbat(D.names(function (i) { return i.fam === f; })[0], { play: 'hover' }), document.createTextNode(' ' + (FAMS[f] ? FAMS[f][0] : f) + ' '), el('span', { text: String(n) })]);
+    b.onclick = function () { st.fam = st.fam === f ? '' : f; keep(); chips(); render(); }; box.appendChild(b);
+  });
+}
+function apply() {
+  document.querySelectorAll('#case doodle-dingbat').forEach(function (e) { e.setAttribute('look', st.look); e.setAttribute('play', st.play); e.setAttribute('size', (D.info(e.getAttribute('name')).ratio > 1.5 ? Math.round(st.size * 0.8) : st.size) + 'px'); });
+  $('#sheet').classList.toggle('dark', st.look === 'neon');
+  $('#case').style.setProperty('--gs', st.size + 'px'); $('#case').style.setProperty('--cw', Math.max(104, st.size + 48) + 'px');
+  proof();
+}
+function colours() { var r = document.documentElement.style; r.setProperty('--db-a', $('#ca').value); r.setProperty('--db-b', $('#cb').value); r.setProperty('--db-c', $('#cc').value); D.refresh(); }
+
+/* the case: one drawer per family */
+function render() {
+  var box = $('#case'); box.innerHTML = '';
+  var hits = st.q ? D.names(st.q) : null, any = 0;
+  D.families().forEach(function (f) {
+    if (st.fam && st.fam !== f) return;
+    var ns = D.names(function (i) { return i.fam === f; }).filter(function (n) { return !hits || hits.indexOf(n) >= 0; });
+    if (!ns.length) return; any += ns.length;
+    var wide = ns.filter(function (n) { return D.info(n).ratio > 1.5; }), sq = ns.filter(function (n) { return D.info(n).ratio <= 1.5; });
+    var meta = FAMS[f] || [f, ''];
+    var d = el('section', { class: 'drawer', 'aria-label': meta[0] }, [el('h2', {}, [document.createTextNode(meta[0] + ' '), el('small', { text: ns.length + (ns.length === 1 ? ' sort' : ' sorts') })]), el('p', { text: meta[1] })]);
+    [sq, wide].forEach(function (list, wi) {
+      if (!list.length) return;
+      var g = el('div', { class: 'cells' + (wi ? ' wide' : '') });
+      list.forEach(function (n) {
+        var i = D.info(n), c = el('button', { class: 'cell', type: 'button', 'data-n': n, 'aria-label': n + ': ' + (i.about || ''), 'aria-current': String(st.sel === n) }, [el('div', { class: 'g' }, [dingbat(n, { look: st.look, play: st.play, size: (i.ratio > 1.5 ? Math.round(st.size * 0.8) : st.size) + 'px' })]), el('div', { class: 'n', text: n })]);
+        if (UNI[n]) c.appendChild(el('span', { class: 'u', text: UNI[n] + ' ' + code(UNI[n]), 'aria-hidden': 'true' }));
+        c.onclick = function () { st.sel = n; document.querySelectorAll('.cell[aria-current="true"]').forEach(function (x) { x.setAttribute('aria-current', 'false'); }); c.setAttribute('aria-current', 'true'); proof(); };
+        g.appendChild(c);
+      });
+      d.appendChild(g);
+    });
+    box.appendChild(d);
+  });
+  if (!any) box.appendChild(el('p', { class: 'empty', text: 'Nothing here is called “' + st.q + '”. Try a thing (kite), a feeling (sleepy) or a use (loading).' }));
+  apply();
+}
+
+/* the proof of the chosen sort */
+function proof() {
+  var n = st.sel, i = D.info(n); if (!i) return;
+  var box = $('#proof'), wide = i.ratio > 1.5; box.innerHTML = '';
+  var big = dingbat(n, { look: st.look, size: (wide ? 64 : 168) + 'px', label: n });
+  box.appendChild(el('div', { class: 'stage' + (wide ? ' wide' : '') }, [big]));
+  var body = el('div', { class: 'body' });
+  body.appendChild(el('h3', {}, [document.createTextNode(n), el('small', { text: (FAMS[i.fam] ? FAMS[i.fam][0] : i.fam) + (UNI[n] ? ' · ' + UNI[n] + ' ' + code(UNI[n]) : '') })]));
+  var dl = el('dl');
+  [['Moves', i.about], ['Tap', i.tap], ['Loop', i.loop + ' s'], ['Words', i.tags.join(', ')]].forEach(function (r) { if (r[1]) { dl.appendChild(el('dt', { text: r[0] })); dl.appendChild(el('dd', { text: r[1] })); } });
+  body.appendChild(dl);
+  var sizes = el('div', { class: 'sizes' });
+  (wide ? [16, 24, 40] : [16, 24, 32, 48, 72]).forEach(function (s) { sizes.appendChild(el('figure', {}, [dingbat(n, { look: st.look, size: s + 'px', play: 'loop' }), el('figcaption', { text: s + ' px' })])); });
+  body.appendChild(sizes);
+  var demo = el('p', { class: 'inline-demo' });
+  demo.append('In a sentence: the reply came back ', dingbat(n, { look: st.look }), ' and the afternoon went on.');
+  if (wide) { demo.innerHTML = ''; demo.append('Between sections:', el('br'), dingbat(n, { look: st.look, size: '1.4em' })); }
+  body.appendChild(demo);
+  var looks = el('div', { class: 'looks' });
+  LOOKS.forEach(function (l) { looks.appendChild(el('div', { class: l === 'neon' ? 'neon' : '' }, [dingbat(n, { look: l, size: (wide ? 18 : 40) + 'px' }), el('span', { text: l })])); });
+  body.appendChild(looks);
+  var tag = '<doodle-dingbat name="' + n + '"' + (st.look !== 'ink' ? ' look="' + st.look + '"' : '') + '></doodle-dingbat>';
+  body.appendChild(el('pre', { text: tag }));
+  var row = el('div', { class: 'row' });
+  var b1 = el('button', { class: 'btn', type: 'button', text: 'Copy tag' }); b1.onclick = function () { copy(tag, 'Tag copied'); };
+  var b2 = el('button', { class: 'btn plain', type: 'button', text: 'Copy SVG' }); b2.onclick = function () { copy(D.svg(n, { look: st.look, size: 96, a: $('#ca').value, b: $('#cb').value, c: $('#cc').value }), 'SVG copied: a still frame'); };
+  var b3 = el('button', { class: 'btn plain', type: 'button', text: 'Copy moving SVG' }); b3.onclick = function () { copy(D.svgLoop(n, { look: st.look, size: 96, a: $('#ca').value, b: $('#cb').value, c: $('#cc').value }), 'Moving SVG copied'); };
+  row.append(b1, b2, b3); body.appendChild(row);
+  body.appendChild(el('p', { class: 'note', text: 'The moving SVG plays wherever an image does: an img tag, a README, a slide. GIF, APNG and WebP come from tools/export.mjs.' }));
+  box.appendChild(body);
+}
+
+$('#q').addEventListener('input', function (e) { st.q = e.target.value.trim(); render(); });
+$('#sz').value = st.size; $('#sz').addEventListener('input', function (e) { st.size = +e.target.value; keep(); apply(); });
+['#ca', '#cb', '#cc'].forEach(function (s) { $(s).addEventListener('input', colours); });
+$('#rain').addEventListener('click', function (e) { var f = st.fam || D.info(st.sel).fam, ns = D.names(function (i) { return i.fam === f && i.ratio <= 1.5; }); D.burst(e.currentTarget, { names: ns.length ? ns.slice(0, 10) : ['star', 'heart', 'sparkle'], n: 16, size: 30, look: st.look === 'neon' ? 'ink' : st.look }); });
+D.bullets($('#list-demo'), ['sprout', 'kratip', 'telephone']);
+$('#save-demo').addEventListener('click', function (e) { D.burst(e.currentTarget, { names: ['star', 'sparkle', 'heart'], n: 12 }); });
+seg('look', LOOKS, 'look'); seg('play', PLAYS, 'play'); chips(); render();
+})();
+</script>
