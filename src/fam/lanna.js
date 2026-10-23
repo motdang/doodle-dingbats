@@ -1065,4 +1065,48 @@ D.add('cha-yen', {
     p.line(33, 28, 36.5, 76, { w: 0.5, ink: 'white', alpha: 0.9, detail: true });
   }
 });
+/* the hongsa (หงส์), Hongdam's black swan: a curled Lanna feather, a red bill with its white band */
+function feather(p, x, y, ang, len, ph, small) {
+  p.at(x, y, ang, 1, function () {
+    var sp = bez([0, 0], [-len * 0.18, -len * 0.42], [-len * 0.5, -len * 0.78], [-len * 0.95, -len * 0.82], 14), n = sp.length;
+    var h = Math.atan2(sp[n - 1][1] - sp[n - 2][1], sp[n - 1][0] - sp[n - 2][0]), st = Math.hypot(sp[n - 1][0] - sp[n - 2][0], sp[n - 1][1] - sp[n - 2][1]), q = sp[n - 1].slice(), k, curl = 0.42 + 0.05 * Math.sin(TAU * ph);
+    for (k = 0; k < 18; k++) { h -= curl; st *= 0.9; q = [q[0] + Math.cos(h) * st, q[1] + Math.sin(h) * st]; sp.push(q); }
+    tube(p, sp, function (s) { return 8 * Math.pow(1 - s, 0.85) + 0.9; }, { fill: 'black' });
+    if (!small) p.curve(sp.slice(3, sp.length - 3), { ink: 'a', w: 0.5, wob: 0.4 });
+  });
+}
+function swanWing(p, x, y, ang, k, far) {
+  if (k < 0.02) return;
+  p.at(x, y, ang, k, function () {
+    p.path('M0 0 C-4 -20 -22 -36 -46 -38 C-40 -31 -38 -25 -40 -18 C-33 -16 -29 -9 -31 -2 C-20 -3 -9 -1 0 0 Z', { fill: far ? 'night' : 'black' });
+    [[-41, -31, 0.5], [-37, -22, 0.35], [-34, -13, 0.2], [-27, -6, 0.1]].forEach(function (f) { p.ellipse(f[0], f[1], 5.2, 2.2, { fill: 'white', w: 0.5, rot: f[2] }); });
+  });
+}
+D.add('hongsa', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hamsa', 'hongdam', 'bird', 'water', 'float', 'lanna', '🦢'], loop: 3, still: 0.2, ratio: 1.2, burst: 'spark', burstAt: [62, 30], burstN: 6, burstSpread: 3, burstColor: 'gold', tapLen: 1.6, tapRest: 0.45, margin: [26, 16, 14, 16],
+  about: 'the black swan rides the water: it bobs, its neck sways a beat behind, its curled feathers lift in the breeze, rings spread from its breast', tapAbout: 'it rears up and opens its wings, the white flight feathers flashing, then settles back on the water',
+  draw: function (p, t, s) {
+    var q = s.tap >= 0 ? s.tap : 0, lift = s.tap >= 0 ? M.ease(M.seg(q, 0.04, 0.3)) * (1 - M.ease(M.seg(q, 0.72, 1))) : 0, flap = lift * 0.28 * Math.sin(TAU * 2 * q), bob = 1.3 * M.wave(t, 1) - 3 * lift, k;
+    if (!p.small) {
+      for (k = 0; k < 2; k++) { var u = M.frac(t + k / 2); p.ellipse(80, 83, 6 + 18 * u, 1.6 + 2.4 * u, { ink: 'sky', w: 0.6, alpha: 0.9 * (1 - u), fill: false }); }
+      p.curve(sinew(4, 116, 90, 1.1, 26, t + 0.3), { ink: 'sky', w: 0.5, alpha: 0.6 });
+    }
+    p.curve(sinew(8, 112, 84, 1.4, 22, t), { ink: 'sky', w: 0.8 });
+    p.move(0, bob);
+    swanWing(p, 58, 58, -0.25 + flap, lift, true);
+    feather(p, 36, 60, 0.12 + 0.05 * M.wave(t, 1, 0.1), 30, t, p.small);
+    feather(p, 46, 57, 0.36 + 0.05 * M.wave(t, 1, 0.16), 36, t + 0.3, p.small);
+    feather(p, 56, 58, 0.62 + 0.04 * M.wave(t, 1, 0.22), 26, t + 0.6, p.small);
+    p.path('M20 63 C28 51 52 51 68 56 C80 60 87 66 83 74 C77 82 44 84 30 79 C21 75 17 69 20 63 Z', { fill: 'black' });
+    if (!p.small) p.path('M34 63 C38 60 42 61 45 63 C48 60 52 61 55 64 C58 61 62 62 65 65', { ink: 'grey', w: 0.5, detail: true });
+    p.pivot(76, 64, 0.05 * M.wave(t, 1, 0.06) - 0.14 * lift, 1, function () {
+      tube(p, bez([74, 64], [87, 51], [76, 37], [89, 24], 16), function (s) { return 9.5 - 3.8 * s; }, { fill: 'black' });
+      p.ellipse(91, 23, 7.4, 5.4, { fill: 'black', rot: -0.15 });
+      p.path('M96 20 L111 25 C111.6 27.2 109.2 28.6 106.4 28.4 L96 27.6 Z', { fill: 'red' });
+      p.line(105, 23.6, 104.5, 28.2, { ink: 'white', w: 1, wob: 0.3 });
+      p.dot(92, 21.2, 1.8, 'red'); p.dot(92.5, 20.7, 0.6, 'white');
+    });
+    swanWing(p, 56, 60, -0.05 + flap * 1.2, lift, false);
+  }
+});
 })(Dingbats);
