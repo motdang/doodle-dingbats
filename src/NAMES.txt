@@ -9,3 +9,4 @@ kitchen: coffee teapot noodles egg toast ice-cream cake wine beer pizza popcorn 
 curious: orrery pendulums cradle metronome mobius penrose tesseract lissajous hilbert spirograph gears compass sundial lighthouse galton dna atom cube dice coin key music-box balloon rocket telescope magnet prism lava-lamp snow-globe paper-boat kite crane abacus typewriter hanoi fibonacci fourier cycloid sierpinski top
 ornament: vine wave-rule footsteps scallop lai-kham birds ants train tung bunting string-lights ricrac fleuron stars-row river fence ellipsis squiggle corner stitches washing-line zipper dominoes caterpillar candles rosette
 work: page translate stamp wrench laptop server parcel passport
+fete: golf-ball x-mark
