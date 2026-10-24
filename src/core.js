@@ -234,6 +234,8 @@ function hsl(c) {
 }
 function lum(c) { return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255; }
 var RISO = { pink: '#FF48B0', blue: '#0078BF', yellow: '#FFE800', teal: '#00838A', ink: '#3255A4' };
+/* a page printing in its own inks can hand them over: Dingbats.riso({ pink, blue, yellow, teal, ink }) */
+D.riso = function (o) { Object.keys(o || {}).forEach(function (k) { if (k in RISO && o[k]) RISO[k] = o[k]; }); if (D.refresh) D.refresh(); };
 function risoOf(hex) {
   var c = hex2rgb(hex), q = hsl(c);
   if (q[2] > 0.9) return null;                       /* paper */
