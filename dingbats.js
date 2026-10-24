@@ -6329,11 +6329,11 @@ function goSwan(p, t, s, r) {
     var u = A.u;
     if (A.k === 'dip') {   /* up-ends: the head goes down under the water, the tail and feet come up, the feet kick */
       var dv = ez(seg(u, 0.06, 0.28)) * (1 - ez(seg(u, 0.7, 0.92)));
-      N = nk(N, NK.dive, dv); o.tilt += 0.85 * dv; o.y -= 10 * dv; pad = u * 10; kick = 1 + 0.6 * dv;
+      N = nk(N, NK.dive, dv); o.tilt += 0.85 * dv; o.y -= 10 * dv; pad = u * 5; kick = 1 + 0.6 * dv;
       after = function () { drops(p, X + 30, W, (u - 0.2) * 2.4, 0.8, 'c', 5); drops(p, X + 26, W, (u - 0.74) * 2.4, 0.9, 'c', 9); };
     } else if (A.k === 'rear') {   /* rises up on the water and beats its wings */
       var rr = ez(seg(u, 0.06, 0.2)) * (1 - ez(seg(u, 0.8, 0.95)));
-      N = nk(N, NK.peek, 0.6 * rr); o.y -= 13 * rr; o.tilt -= 0.4 * rr; o.wings = rr; o.flap = rr * Math.sin(TAU * 3 * seg(u, 0.18, 0.82)); pad = u * 8; kick = 1.4;
+      N = nk(N, NK.peek, 0.6 * rr); o.y -= 13 * rr; o.tilt -= 0.4 * rr; o.wings = rr; o.flap = rr * Math.sin(TAU * 3 * seg(u, 0.18, 0.82)); pad = u * 4; kick = 1.4;
       after = function () { var k; for (k = 0; k < 3; k++) drops(p, X - 14 + 12 * k, W, (u - 0.3 - 0.1 * k) * 1.6, 0.7, 'c', 13 + k); };
     } else if (A.k === 'look') {   /* turns to look at you and blinks */
       var lk = ez(seg(u, 0.05, 0.2)) * (1 - ez(seg(u, 0.75, 0.92)));
@@ -6357,7 +6357,7 @@ function goSwan(p, t, s, r) {
   swanTap(o, s);
   if ((r.wo || 0) > 0.02 && !o.wings) o.wing = function (pp, far) { flyWing(pp, far ? 3 : -1, far ? -15 : -12, r.we || 0, r.wo * (r.wk || 1.1), (r.wsw || 0) + (far ? -0.1 : 0), far); };
   var onWater = w > 0.5, ank = onWater ? W - 1 : G - 2.6;
-  if (onWater && pad == null && !r.ft) pad = t * 2;
+  if (onWater && pad == null && !r.ft) pad = t;
   function leg(far) {
     var h = swHip(o, far), a, fa = 0, sp = 0.45, tilt = o.tilt;
     if (r.ft) { var f = r.ft[far ? 1 : 0]; a = [X + f[0], ank - f[1]]; fa = f[2] || 0; sp = f[3] == null ? 0.45 : f[3]; }
@@ -6372,13 +6372,13 @@ function goSwan(p, t, s, r) {
   }
   function bird(under) {
     var j0 = p.marks.length, k; leg(true); var j1 = p.marks.length; swan(p, o); var j2 = p.marks.length; leg(false);
-    if (under) for (k = j0; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= k >= j1 && k < j2 ? 0.35 : 0.75;
+    if (under) for (k = j0; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= k >= j1 && k < j2 ? 0.35 : 0.4;
   }
   if (!r.water) {
     var hi = Math.min(1, alt / 50);
     p.ellipse(X - 3, G + 0.5, 22 * (1 - 0.5 * hi), 2.6, { fill: 'smoke', line: false, alpha: 0.55 * (1 - 0.75 * hi) });
     bird();
-  } else {   /* under the surface it shows faint, as through the water */
+  } else {   /* under the surface it shows faint, as through the water; the feet fainter still (her word 2026-10-24: "lighter, less visible") */
     p.clip('M-300 -300 H500 V' + W + ' H-300 Z', function () { bird(false); });
     p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { bird(true); });
   }
@@ -6592,7 +6592,7 @@ function goDam(p, t, s, r) {
   }
   W -= (r.lw || 15) / 2;
   var roll = (r.roll || 0) + (r.tilt || 0), y = M.lerp(64, W - 5, w) - hop - (r.bob || 0), onWater = w > 0.5, ank = onWater ? W - 1 : G - 1.5, pad = r.pad;
-  if (onWater && pad == null && !r.ft) pad = t * 3;
+  if (onWater && pad == null && !r.ft) pad = t * 2;
   function leg(far) {
     var hx = 1 + (far ? -3.5 : 0), hy = 12, c = Math.cos(roll), sn = Math.sin(roll), h = [X + hx * c - hy * sn, y + hx * sn + hy * c], a, fa = 0, sp = 1;
     if (r.ft) { var f = r.ft[far ? 1 : 0]; a = [X + f[0], ank - f[1]]; fa = f[2] || 0; sp = f[3] == null ? 1 : f[3]; }
@@ -6605,7 +6605,7 @@ function goDam(p, t, s, r) {
     var j0 = p.marks.length, k; leg(true); var j1 = p.marks.length;
     cygnet(p, { x: X, y: y, tilt: roll, age: 0, look: look, blink: r.blink || 0, beak: beak, flap: flap, head: r.head || 0, t: t });
     var j2 = p.marks.length; leg(false);
-    if (under) for (k = j0; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= k >= j1 && k < j2 ? 0.35 : 0.75;
+    if (under) for (k = j0; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= k >= j1 && k < j2 ? 0.35 : 0.4;
   }
   if (!r.water) { p.ellipse(X + 2, G + 0.5, 17 * (1 - Math.min(0.4, hop / 30)), 2.4, { fill: 'smoke', line: false, alpha: 0.55 }); chick(); }
   else {
@@ -6631,7 +6631,7 @@ D.add('duckling-float', {
   tapAbout: 'it looks up at you, peeps and flaps its two stubs of wings',
   draw: function (p, t, s) {
     var seg = M.seg, ez = M.ease, bump = M.bump, look = ez(seg(t, 0.2, 0.25)) * (1 - ez(seg(t, 0.42, 0.47)));
-    goDam(p, t, s, { water: 1, w: 1, pad: 9 * t, bob: 1.2 * M.wave(t, 6), look: look, beak: bump(seg(t, 0.3, 0.34)) + bump(seg(t, 0.62, 0.66)),
+    goDam(p, t, s, { water: 1, w: 1, pad: 6 * t, bob: 1.2 * M.wave(t, 6), look: look, beak: bump(seg(t, 0.3, 0.34)) + bump(seg(t, 0.62, 0.66)),
       blink: Math.min(1, bump(seg(t, 0.1, 0.13)) + bump(seg(t, 0.36, 0.39))), rip: [0, 1].map(function (i) { var a = M.frac(2 * t + i / 2); return [-20 - 6 * a, a]; }) });
   }
 });
