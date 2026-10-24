@@ -4,7 +4,7 @@
 
    On a page
      <doodle-dingbat name="lantern"></doodle-dingbat>      or      <i data-dingbat="lantern"></i>
-       look   ink (default) · paper · riso · neon · mono
+       look   ink (default) · paper · riso · neon · mono · wash (watercolour and crayon) · pencil (graphite)
        play   loop (default) · hover · once · still
        size   any CSS length; 1em by default, so it takes the size of the words around it
        a b c skin   colours; the line is the text colour
@@ -360,7 +360,7 @@ function geometry(marks, env) {
       }
     }
     if (!mk.ink) return;
-    var W = U.W * mk.w * (look === 'paper' ? 0.8 : 1), polys = [], cores = [], ph = R() * TAU;
+    var W = U.W * mk.w * (look === 'paper' ? 0.8 : look === 'pencil' ? 0.68 : look === 'wash' ? 0.84 : 1), polys = [], cores = [], ph = R() * TAU;
     subs.forEach(function (s) {
       if (s.p.length < 2) return;
       var q = wobble(s.p, s.z, amp, R), runs;
@@ -446,10 +446,57 @@ function grain(ctx, key, col, holes) {
   return (PATS[k] = ctx.createPattern(c, 'repeat'));
 }
 function trace(ctx, subs) { ctx.beginPath(); subs.forEach(function (s) { if (!s.length) return; ctx.moveTo(s[0][0], s[0][1]); for (var i = 1; i < s.length; i++) ctx.lineTo(s[i][0], s[i][1]); ctx.closePath(); }); }
-function patScale(pat, k) { if (pat && pat.setTransform && typeof DOMMatrix !== 'undefined') pat.setTransform(new DOMMatrix().scaleSelf(k, k)); return pat; }
+function patScale(pat, k, deg) { if (pat && pat.setTransform && typeof DOMMatrix !== 'undefined') pat.setTransform(new DOMMatrix().scaleSelf(k, k).rotateSelf(deg || 0)); return pat; }
+/* wash and pencil (hongdam.net, her ask 2026-10-24: "casual mixed media: watercolor, crayon, graphite, slightly grainy
+   paper"). wash paints a fill as watercolour: thin pigment, pooled darker where it settled, a darker edge where it dried,
+   the paper's tooth showing through; and a line as crayon, the paper's grain dragged across it. pencil draws a sketch:
+   graphite lines and a faint tone where the paint will go. */
+var RGBS = {};
+function rgbOf(col) {   /* any CSS colour (a page may hand over oklch or a name) as [r, g, b] */
+  col = String(col || '#000'); if (RGBS[col]) return RGBS[col];
+  if (col[0] === '#' || /^rgb/.test(col) || !DOC) return (RGBS[col] = hex2rgb(col));
+  var c = DOC.createElement('canvas'); c.width = c.height = 1; var x = c.getContext('2d', { willReadFrequently: true });
+  x.fillStyle = '#000'; x.fillStyle = col; x.fillRect(0, 0, 1, 1); var d = x.getImageData(0, 0, 1, 1).data;
+  return (RGBS[col] = [d[0], d[1], d[2]]);
+}
+function mix(a, b, k) { var p = rgbOf(a), q = rgbOf(b); return rgb2hex([lerp(p[0], q[0], k), lerp(p[1], q[1], k), lerp(p[2], q[2], k)]); }
+function canvasOf(N) { var c = DOC.createElement('canvas'); c.width = c.height = N; return c; }
+/* soft blotches of a darker shade, tiling: where the pigment pooled as it dried (value noise, two octaves) */
+function pool(ctx, col) {
+  var k = 'pool' + col; if (PATS[k]) return PATS[k]; if (!DOC) return null;
+  var N = 128, c = canvasOf(N), x = c.getContext('2d'), im = x.createImageData(N, N), R = rng(hash(k)), rgb = rgbOf(mix(col, '#000', 0.4)), oct = [[5, 1], [11, 0.5]];
+  var grids = oct.map(function (o) { var g = []; for (var i = 0; i < o[0] * o[0]; i++) g.push(R()); return g; });
+  for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
+    var n = 0, w = 0;
+    oct.forEach(function (o, q) {
+      var G = o[0], g = grids[q], fx = i / N * G, fy = j / N * G, a = Math.floor(fx), b = Math.floor(fy), u = ease(fx - a), v = ease(fy - b);
+      var at = function (aa, bb) { return g[(bb % G) * G + (aa % G)]; };
+      n += o[1] * lerp(lerp(at(a, b), at(a + 1, b), u), lerp(at(a, b + 1), at(a + 1, b + 1), u), v); w += o[1];
+    });
+    var p = (j * N + i) * 4; im.data[p] = rgb[0]; im.data[p + 1] = rgb[1]; im.data[p + 2] = rgb[2]; im.data[p + 3] = Math.round(clamp((n / w - 0.4) * 2.2, 0, 1) * 165);
+  }
+  x.putImageData(im, 0, 0); return (PATS[k] = ctx.createPattern(c, 'repeat'));
+}
+/* the paper's tooth: small clumps of its colour where pigment did not settle (sparse, so a dark wash stays a wash) */
+function tooth(ctx, col) {
+  var k = 'tooth' + col; if (PATS[k]) return PATS[k]; if (!DOC) return null;
+  var N = 96, c = canvasOf(N), x = c.getContext('2d'), R = rng(hash(k));
+  x.fillStyle = col;
+  for (var i = 0; i < 150; i++) { x.globalAlpha = 0.25 + 0.55 * R(); x.fillRect(Math.floor(R() * N), Math.floor(R() * N), 1 + Math.floor(R() * 2), 1 + Math.floor(R() * 2)); }
+  return (PATS[k] = ctx.createPattern(c, 'repeat'));
+}
+/* crayon: short streaks of the paper across a stroke, where the wax skipped over the grain */
+function streaks(ctx, col) {
+  var k = 'streak' + col; if (PATS[k]) return PATS[k]; if (!DOC) return null;
+  var N = 64, c = canvasOf(N), x = c.getContext('2d'), R = rng(hash(k));
+  x.fillStyle = col;
+  for (var i = 0; i < 110; i++) { x.globalAlpha = 0.3 + 0.45 * R(); var h = R() < 0.5; x.fillRect(Math.floor(R() * N), Math.floor(R() * N), h ? 2 + Math.floor(R() * 3) : 1, h ? 1 : 2 + Math.floor(R() * 2)); }
+  return (PATS[k] = ctx.createPattern(c, 'repeat'));
+}
 /* ops drawn into ctx, whose transform already maps box units; dev = device pixels per unit */
 function paint(ctx, ops, env, dev) {
-  var look = env.look, inv = 1 / dev, clips = 0;
+  var look = env.look, inv = 1 / dev, clips = 0, px = env.px || 48, css = 100 / px, small = px < 30, bgc = env.bg || '#FFFFFF';
+  var lead = look === 'pencil' ? mix(env.ink || '#1E1E1E', bgc, 0.32) : null;   /* graphite: the ink, a shade lighter */
   ops.forEach(function (op) {
     if (op.k === 'clip') { ctx.save(); clips++; trace(ctx, op.subs); ctx.clip('nonzero'); return; }
     if (op.k === 'unclip') { if (clips) { ctx.restore(); clips--; } return; }
@@ -466,10 +513,18 @@ function paint(ctx, ops, env, dev) {
         ctx.shadowColor = 'transparent'; var g = patScale(grain(ctx, 'paper', '#000', false), inv); if (g) { ctx.fillStyle = g; ctx.fill(op.rule || 'nonzero'); }
         ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = Math.max(0.5, 0.9 / dev); ctx.stroke();
       }
+      else if (look === 'wash' && op.name !== 'bg') {
+        var A0 = ctx.globalAlpha, rule = op.rule || 'nonzero', dpr = dev * css, wc = mix(c, bgc, 0.16); trace(ctx, op.subs);
+        ctx.globalAlpha = A0 * 0.8; ctx.fillStyle = wc; ctx.shadowColor = wc; ctx.shadowBlur = (small ? 1 : 2.4) * dpr; ctx.fill(rule); ctx.shadowColor = 'transparent';   /* the wash, bleeding a little into the paper */
+        var pl = !small && patScale(pool(ctx, c), inv * 2.2); if (pl) { ctx.globalAlpha = A0; ctx.fillStyle = pl; ctx.fill(rule); }
+        ctx.globalAlpha = A0 * 0.62; ctx.strokeStyle = mix(c, '#000', 0.38); ctx.lineJoin = 'round'; ctx.lineWidth = css * (small ? 0.8 : 1.4); ctx.stroke();   /* where it dried */
+        var th = px >= 20 && patScale(tooth(ctx, bgc), inv); if (th) { ctx.globalAlpha = A0 * 0.6; ctx.fillStyle = th; ctx.fill(rule); }
+      }
+      else if (look === 'pencil' && op.name !== 'bg') { ctx.globalAlpha *= 0.1; ctx.fillStyle = lead; trace(ctx, op.subs); ctx.fill(op.rule || 'nonzero'); }
       else { if (op.glow && look !== 'mono') { ctx.shadowColor = c; ctx.shadowBlur = op.glow * dev * 8; } ctx.fillStyle = c; trace(ctx, op.subs); ctx.fill(op.rule || 'nonzero'); }
     } else if (op.k === 'hatch') {
       trace(ctx, op.clip); ctx.clip('nonzero');
-      ctx.fillStyle = look === 'riso' ? RISO.ink : look === 'neon' ? neonOf(op.c) : op.c;
+      ctx.fillStyle = look === 'riso' ? RISO.ink : look === 'neon' ? neonOf(op.c) : look === 'pencil' ? lead : op.c;
       if (look === 'riso') ctx.globalCompositeOperation = 'multiply';
       trace(ctx, op.lines); ctx.fill('nonzero');
     } else if (op.k === 'line') {
@@ -482,6 +537,12 @@ function paint(ctx, ops, env, dev) {
       } else if (look === 'paper') {
         ctx.shadowColor = 'rgba(0,0,0,.34)'; ctx.shadowBlur = Math.max(1, dev * 1.2); ctx.shadowOffsetX = Math.max(0.4, dev * 0.5); ctx.shadowOffsetY = Math.max(0.6, dev * 0.8);
         ctx.fillStyle = lc; trace(ctx, op.polys); ctx.fill('nonzero');
+      } else if (look === 'wash') {
+        if (op.name !== 'bg') ctx.globalAlpha *= 0.92;
+        ctx.fillStyle = lc; trace(ctx, op.polys); ctx.fill('nonzero');
+        var st = !small && op.name !== 'bg' && patScale(streaks(ctx, bgc), inv); if (st) { ctx.fillStyle = st; ctx.fill('nonzero'); }
+      } else if (look === 'pencil' && op.name !== 'bg') {
+        ctx.globalAlpha *= 0.85; ctx.fillStyle = patScale(grain(ctx, 'pencil', lead, true), inv) || lead; trace(ctx, op.polys); ctx.fill('nonzero');
       } else { if (op.glow && !op.fc && look !== 'mono') { ctx.shadowColor = lc; ctx.shadowBlur = op.glow * dev * 8; }   /* a filled mark glows from its fill, not its outline */ ctx.fillStyle = lc; trace(ctx, op.polys); ctx.fill('nonzero'); }
     }
     ctx.restore();
@@ -6312,7 +6373,14 @@ function waterMarks(p, r, X, top, G) {
     var a = q[1], hw = 3 + 15 * a, cx = X + q[0], y = top + 2.4 * a, h = 2.4 * (1 - 0.7 * a);
     p.curve([[cx - hw, y], [cx - hw * 0.45, y - h], [cx + hw * 0.45, y - h], [cx + hw, y]], { ink: 'c', w: 0.95 - 0.45 * a, wob: 0.4 });
   });
-  if (r.water && (r.w || 0) > 0.5 && r.v > 15) { var bw = Math.min(1, (r.v - 15) / 110); p.curve([[X + 28, top + 0.5], [X + 37, top - 1 - 3 * bw], [X + 44 + 7 * bw, top + 0.5]], { ink: 'c', w: 0.9, wob: 0.4 }); }
+  /* the bow wave and the wake behind: they grow with its speed and fade as it glides in, so a swan at rest leaves none */
+  var sp = r.water && (r.w || 0) > 0.5 ? M.clamp((r.v || 0) / 70, 0, 1) : 0;
+  if (sp > 0.03) {
+    var bw = Math.min(1, Math.max(0, (r.v - 15) / 110)), L = 14 + 30 * sp;
+    p.curve([[X + 28, top + 0.5], [X + 37, top - 1 - 3 * bw], [X + 44 + 7 * bw, top + 0.5]], { ink: 'c', w: 0.9, wob: 0.4, alpha: Math.min(1, 1.5 * sp) });
+    p.curve([[X - 30, top + 0.8], [X - 30 - 0.5 * L, top + 1.6], [X - 30 - L, top + 3.4]], { ink: 'c', w: 0.8, wob: 0.4, alpha: 0.85 * sp });
+    p.curve([[X - 24, top + 1.6], [X - 24 - 0.55 * L, top + 3.6], [X - 24 - 1.1 * L, top + 6.4]], { ink: 'c', w: 0.65, wob: 0.4, alpha: 0.6 * sp });
+  }
   (r.spl || []).forEach(function (q, i) { drops(p, X + q[0], q[3] ? G : top, q[1], q[2], q[3] ? 'smoke' : 'c', 31 + i * 7 + Math.round(q[0])); });
 }
 function goSwan(p, t, s, r) {

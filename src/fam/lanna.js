@@ -1481,7 +1481,14 @@ function waterMarks(p, r, X, top, G) {
     var a = q[1], hw = 3 + 15 * a, cx = X + q[0], y = top + 2.4 * a, h = 2.4 * (1 - 0.7 * a);
     p.curve([[cx - hw, y], [cx - hw * 0.45, y - h], [cx + hw * 0.45, y - h], [cx + hw, y]], { ink: 'c', w: 0.95 - 0.45 * a, wob: 0.4 });
   });
-  if (r.water && (r.w || 0) > 0.5 && r.v > 15) { var bw = Math.min(1, (r.v - 15) / 110); p.curve([[X + 28, top + 0.5], [X + 37, top - 1 - 3 * bw], [X + 44 + 7 * bw, top + 0.5]], { ink: 'c', w: 0.9, wob: 0.4 }); }
+  /* the bow wave and the wake behind: they grow with its speed and fade as it glides in, so a swan at rest leaves none */
+  var sp = r.water && (r.w || 0) > 0.5 ? M.clamp((r.v || 0) / 70, 0, 1) : 0;
+  if (sp > 0.03) {
+    var bw = Math.min(1, Math.max(0, (r.v - 15) / 110)), L = 14 + 30 * sp;
+    p.curve([[X + 28, top + 0.5], [X + 37, top - 1 - 3 * bw], [X + 44 + 7 * bw, top + 0.5]], { ink: 'c', w: 0.9, wob: 0.4, alpha: Math.min(1, 1.5 * sp) });
+    p.curve([[X - 30, top + 0.8], [X - 30 - 0.5 * L, top + 1.6], [X - 30 - L, top + 3.4]], { ink: 'c', w: 0.8, wob: 0.4, alpha: 0.85 * sp });
+    p.curve([[X - 24, top + 1.6], [X - 24 - 0.55 * L, top + 3.6], [X - 24 - 1.1 * L, top + 6.4]], { ink: 'c', w: 0.65, wob: 0.4, alpha: 0.6 * sp });
+  }
   (r.spl || []).forEach(function (q, i) { drops(p, X + q[0], q[3] ? G : top, q[1], q[2], q[3] ? 'smoke' : 'c', 31 + i * 7 + Math.round(q[0])); });
 }
 function goSwan(p, t, s, r) {
