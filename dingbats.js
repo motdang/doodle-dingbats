@@ -5949,11 +5949,16 @@ function swanHead(p, turn, blink, small, open) {
   swanEye(p, M.lerp(1.9, -3.1, turn), -1.7, k);
   if (turn > 0.35) swanEye(p, 3.1, -1.7, k);
 }
-/* a black leg from the hip (hx, hy) to the ankle (ax, ay), and its webbed foot at angle fa; spread 0 folded, 1 open */
+/* a leg from the hip (hx, hy) to the ankle (ax, ay) and its red webbed foot (her word 2026-10-24: "flappy pink/red
+   feet"), seen from the side, at angle fa (0 flat with the toes forward, more turns the toes down); spread 1 the web
+   open, 0 folded shut, above 1 slapped down flat and wide */
 function swanLeg(p, hx, hy, ax, ay, fa, spread, far, big, alpha) {
-  var c = far ? 'night' : 'black', s = 0.22 + 0.78 * spread, k = big || 1, al = alpha == null ? 1 : alpha;
+  var c = far ? 'red' : 'rose', s = Math.max(0, spread), k = big || 1, al = alpha == null ? 1 : alpha, h = 0.9 + 2.5 * s, L = 10.5 + 1.6 * Math.min(1, s), top = -0.4 - 0.5 * h;
   p.line(hx, hy, ax, ay, { w: 1.7 * k, ink: c, cap: 'round', alpha: al });
-  p.at(ax, ay, fa, k, function () { p.path('M-1.6 0 L10.5 ' + (-4.8 * s) + ' Q13.4 0 10.5 ' + (4.8 * s) + ' Z', { fill: c, w: 0.6, alpha: al }); if (spread > 0.6 && !p.small) { p.line(1, 0, 10, -2.6 * s, { ink: 'grey', w: 0.35, alpha: al }); p.line(1, 0, 10, 2.6 * s, { ink: 'grey', w: 0.35, alpha: al }); } });
+  p.at(ax, ay, fa, k, function () {
+    p.path('M-1.6 -0.8 L' + L + ' ' + top + ' Q' + (L + 2.4) + ' ' + (0.2 * h) + ' ' + L + ' ' + h + ' L-0.6 1.4 Z', { fill: c, w: 0.6, alpha: al });
+    if (s > 0.45 && !p.small) [0.3, 0.7].forEach(function (f) { p.line(0.6, 0.2, L - 0.6, top + (h - top) * f, { ink: 'red', w: 0.35, alpha: al }); });
+  });
 }
 /* the body: a long low boat, the tail end raised and pointed, a full breast, a flat keel. A swan stands low on short
    legs set far back (a long neck on a body raised on long legs reads as an ostrich: Michael, 2026-10-24) */
@@ -6318,6 +6323,7 @@ function goSwan(p, t, s, r) {
   if (r.hurry) N = nk(N, NK.hurry, r.hurry);
   if (fly) N = nk(N, NK.fly, fly);
   if (r.look) N = nk(N, NK.at, r.look);
+  if (r.nod) N.H = [N.H[0] + 1.6 * r.nod, N.H[1] + 1.2 * r.nod];
   if (r.preen) { N = nk(N, NK.preen, r.preen); var nb = r.preen * Math.sin(TAU * 7 * t); N.H = [N.H[0] + 1.5 * nb, N.H[1] + 1.5 * nb]; }
   if (A) {
     var u = A.u;
@@ -6356,22 +6362,25 @@ function goSwan(p, t, s, r) {
     var h = swHip(o, far), a, fa = 0, sp = 0.45, tilt = o.tilt;
     if (r.ft) { var f = r.ft[far ? 1 : 0]; a = [X + f[0], ank - f[1]]; fa = f[2] || 0; sp = f[3] == null ? 0.45 : f[3]; }
     else if (pad != null) {   /* paddling: each foot sweeps back open and comes forward folded, one after the other */
-      var ph = TAU * pad + (far ? Math.PI : 0), an = 0.5 + 0.42 * Math.sin(ph) * kick, L = 15;
-      a = swBox(o, (far ? -12 : -6) - L * Math.sin(an), 11 + L * Math.cos(an)); fa = -0.25 + 0.6 * Math.sin(ph) + tilt; sp = Math.cos(ph) > 0 ? 1 : 0.15;
+      var ph = TAU * pad + (far ? Math.PI : 0), an = 0.5 + 0.5 * Math.sin(ph) * kick, L = 16;
+      a = swBox(o, (far ? -12 : -6) - L * Math.sin(an), 11 + L * Math.cos(an)); fa = 1 + 0.6 * Math.sin(ph) + tilt; sp = 0.12 + 0.95 * Math.pow(Math.max(0, Math.cos(ph)), 0.6);
     } else a = [X + (far ? SW_FF : SW_FN), ank];
     if (r.tuck) { var T = swBox(o, far ? -37 : -33, far ? 8 : 11); a = [M.lerp(a[0], T[0], r.tuck), M.lerp(a[1], T[1], r.tuck)]; fa = M.lerp(fa, Math.PI + tilt + 0.15, r.tuck); sp = M.lerp(sp, 0.2, r.tuck); }
     if (r.fwd) { var F = swBox(o, far ? 8 : 14, far ? 23 : 26); a = [M.lerp(a[0], F[0], r.fwd), M.lerp(a[1], F[1], r.fwd)]; fa = M.lerp(fa, -0.45, r.fwd); sp = M.lerp(sp, 1, r.fwd); }
     if (!r.water || !onWater) a[1] = Math.min(a[1], r.water ? W + 2 : ank);
-    swanLeg(p, h[0], h[1], a[0], a[1], fa, sp, far, 1.55);
+    swanLeg(p, h[0], h[1], a[0], a[1], fa, sp, far, 1.9);
   }
-  function bird() { leg(true); swan(p, o); leg(false); }
+  function bird(under) {
+    var j0 = p.marks.length, k; leg(true); var j1 = p.marks.length; swan(p, o); var j2 = p.marks.length; leg(false);
+    if (under) for (k = j0; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= k >= j1 && k < j2 ? 0.35 : 0.75;
+  }
   if (!r.water) {
     var hi = Math.min(1, alt / 50);
     p.ellipse(X - 3, G + 0.5, 22 * (1 - 0.5 * hi), 2.6, { fill: 'smoke', line: false, alpha: 0.55 * (1 - 0.75 * hi) });
     bird();
   } else {   /* under the surface it shows faint, as through the water */
-    p.clip('M-300 -300 H500 V' + W + ' H-300 Z', bird);
-    p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { var j = p.marks.length, k; bird(); for (k = j; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= 0.35; });
+    p.clip('M-300 -300 H500 V' + W + ' H-300 Z', function () { bird(false); });
+    p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { bird(true); });
   }
   waterMarks(p, r, X, W, G);
   if (after) after();
@@ -6382,9 +6391,10 @@ function goWalk(t) {
   return {
     ft: [0, 1].map(function (k) {
       var u = M.frac(t + k / 2), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5;
-      return st ? [M.lerp(L, -L, v) - 6, 0, 0, 0.45] : [M.lerp(-L, L, M.ease(v)) - 6, 6 * M.bump(v), 0.5 * M.bump(v), 0.3];
+      var b = M.bump(v);
+      return st ? [M.lerp(L, -L, v) - 6, 0, 0, 1 + 0.25 * (1 - M.ease(M.seg(v, 0, 0.3)))] : [M.lerp(-L, L, M.ease(v)) - 6, 7 * b, 1.25 * Math.pow(b, 0.8) * (1 - M.ease(M.seg(v, 0.75, 1))) + 0.25 * Math.sin(TAU * 2 * v) * b, 1 - 0.85 * b];
     }),
-    bob: 2 * M.bump(M.frac(2 * t)), roll: 0.09 * Math.sin(TAU * t), sway: 0.08 * Math.sin(TAU * t + 0.5)
+    bob: 2.8 * M.bump(M.frac(2 * t)), roll: 0.13 * Math.sin(TAU * t), sway: 0.12 * Math.sin(TAU * t + 0.5), nod: Math.sin(TAU * 2 * t)
   };
 }
 D.add('hongsa-go', {
@@ -6586,20 +6596,21 @@ function goDam(p, t, s, r) {
   function leg(far) {
     var hx = 1 + (far ? -3.5 : 0), hy = 12, c = Math.cos(roll), sn = Math.sin(roll), h = [X + hx * c - hy * sn, y + hx * sn + hy * c], a, fa = 0, sp = 1;
     if (r.ft) { var f = r.ft[far ? 1 : 0]; a = [X + f[0], ank - f[1]]; fa = f[2] || 0; sp = f[3] == null ? 1 : f[3]; }
-    else if (pad != null) { var ph = TAU * pad + (far ? Math.PI : 0), an = 0.45 + 0.4 * Math.sin(ph); a = [h[0] - 10 * Math.sin(an), h[1] + 10 * Math.cos(an)]; fa = -0.25 + 0.6 * Math.sin(ph); sp = Math.cos(ph) > 0 ? 1 : 0.2; }
+    else if (pad != null) { var ph = TAU * pad + (far ? Math.PI : 0), an = 0.45 + 0.45 * Math.sin(ph); a = [h[0] - 11 * Math.sin(an), h[1] + 11 * Math.cos(an)]; fa = 1 + 0.6 * Math.sin(ph); sp = 0.12 + 0.95 * Math.pow(Math.max(0, Math.cos(ph)), 0.6); }
     else a = [X, ank];
     if (!r.water || !onWater) a[1] = Math.min(a[1], r.water ? W + 2 : ank);
     swanLeg(p, h[0], h[1], a[0], a[1], fa, sp, far, 1.25);
   }
-  function chick() {
-    leg(true);
+  function chick(under) {
+    var j0 = p.marks.length, k; leg(true); var j1 = p.marks.length;
     cygnet(p, { x: X, y: y, tilt: roll, age: 0, look: look, blink: r.blink || 0, beak: beak, flap: flap, head: r.head || 0, t: t });
-    leg(false);
+    var j2 = p.marks.length; leg(false);
+    if (under) for (k = j0; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= k >= j1 && k < j2 ? 0.35 : 0.75;
   }
   if (!r.water) { p.ellipse(X + 2, G + 0.5, 17 * (1 - Math.min(0.4, hop / 30)), 2.4, { fill: 'smoke', line: false, alpha: 0.55 }); chick(); }
   else {
-    p.clip('M-300 -300 H500 V' + W + ' H-300 Z', chick);
-    p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { var j = p.marks.length, k; chick(); for (k = j; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= 0.35; });
+    p.clip('M-300 -300 H500 V' + W + ' H-300 Z', function () { chick(false); });
+    p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { chick(true); });
   }
   waterMarks(p, r, X - 8, W, G);
 }
@@ -6610,7 +6621,7 @@ D.add('duckling-go', {
   draw: function (p, t, s) {
     var L = 6;
     goDam(p, t, s, s.rig || { bob: 2.2 * M.bump(M.frac(2 * t)), roll: 0.13 * Math.sin(TAU * t),
-      ft: [0, 1].map(function (k) { var u = M.frac(t + k / 2), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5; return st ? [M.lerp(L, -L, v), 0, 0, 1] : [M.lerp(-L, L, M.ease(v)), 5 * M.bump(v), 0.55 * M.bump(v), 0.3]; }) });
+      ft: [0, 1].map(function (k) { var u = M.frac(t + k / 2), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5, b = M.bump(v); return st ? [M.lerp(L, -L, v), 0, 0, 1] : [M.lerp(-L, L, M.ease(v)), 5 * b, 1.1 * b + 0.25 * Math.sin(TAU * 2 * v) * b, 1 - 0.8 * b]; }) });
   }
 });
 /* Dam afloat by its parent on a job line that is water: it bobs, paddles, looks up at you, peeps */
