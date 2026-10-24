@@ -10,7 +10,8 @@
        a b c skin   colours; the line is the text colour
        weight line weight, 1 by default · speed 1 by default · label words for a screen reader
    In code
-     Dingbats.draw(ctx, name, {x, y, size, t, look …})   one frame inside any canvas
+     Dingbats.draw(ctx, name, {x, y, size, t, look, rig …})   one frame inside any canvas
+     el.__db.puppet(t, rig) / el.__db.release()           the page moves it: frame t, pose rig (s.rig), until released
      Dingbats.svg(name, o) / Dingbats.svgLoop(name, o)   a frame, or the whole loop, as SVG
      Dingbats.burst(x, y, {names, n})                     a spray of small dingbats from a point
      Dingbats.favicon(name)                               the tab's icon, moving
@@ -233,6 +234,8 @@ function hsl(c) {
 }
 function lum(c) { return (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255; }
 var RISO = { pink: '#FF48B0', blue: '#0078BF', yellow: '#FFE800', teal: '#00838A', ink: '#3255A4' };
+/* a page printing in its own inks can hand them over: Dingbats.riso({ pink, blue, yellow, teal, ink }) */
+D.riso = function (o) { Object.keys(o || {}).forEach(function (k) { if (k in RISO && o[k]) RISO[k] = o[k]; }); if (D.refresh) D.refresh(); };
 function risoOf(hex) {
   var c = hex2rgb(hex), q = hsl(c);
   if (q[2] > 0.9) return null;                       /* paper */
@@ -415,7 +418,7 @@ function burst(pen, def, env) {
 /* ---------------------------------------------------------------- one frame */
 function record(name, env) {
   var def = REG[name] || REG['?'], W = 100 * (def.ratio || 1), pen = new Pen(W, env);
-  def.draw.call(def, pen, env.t, { tap: env.tap, taps: env.taps || 0, seed: env.seed || 0, calm: !!env.calm, px: env.px, look: env.look });
+  def.draw.call(def, pen, env.t, { tap: env.tap, taps: env.taps || 0, seed: env.seed || 0, calm: !!env.calm, px: env.px, look: env.look, rig: env.rig || null });
   burst(pen, def, env);
   return { def: def, W: W, marks: pen.marks };
 }
@@ -423,7 +426,7 @@ function envOf(name, o) {
   o = o || {};
   var def = REG[name] || REG['?'];
   return { name: name, t: o.t == null ? (def.still == null ? 0.25 : def.still) : frac(o.t), tap: o.tap == null ? -1 : o.tap, taps: o.taps || 0, boil: o.boil || 0, seed: o.seed || 0,
-    px: o.px || o.size || 96, look: o.look || 'ink', ink: o.ink, bg: o.bg, weight: o.weight, calm: o.calm, coarse: o.coarse,
+    px: o.px || o.size || 96, look: o.look || 'ink', ink: o.ink, bg: o.bg, weight: o.weight, calm: o.calm, coarse: o.coarse, rig: o.rig,
     cols: { a: o.a, b: o.b, c: o.c, skin: o.skin } };
 }
 D.ops = function (name, o) { var env = envOf(name, o), r = record(name, env); return { W: r.W, H: 100, ops: geometry(r.marks, env), env: env }; };
@@ -601,6 +604,10 @@ if (DOC) (function () {
     I.stop = function () { var k = LIVE.indexOf(I); if (k >= 0) LIVE.splice(k, 1); if (IO) IO.unobserve(el); if (RO) RO.unobserve(el); el.removeEventListener('click', I.onTap); el.removeEventListener('pointerenter', I.on); el.removeEventListener('pointerleave', I.off); el.removeEventListener('focusin', I.on); el.removeEventListener('focusout', I.off); el.__db = null; };
     I.onTap = function () { I.tap0 = now(); I.taps++; var dd = REG[I.name] || {}; if (!calm() && !I.burstM && (dd.burst !== false || dd.tapMargin != null)) { I.burstM = 1; size(I); } kick(); };
     I.on = function () { I.hot = true; kick(); }; I.off = function () { I.hot = false; };
+    /* a page that moves the thing itself holds its strings: puppet(t, rig) draws frame t with the pose rig now, and the
+       clock waits until release() */
+    I.puppet = function (t, rig) { I.held = 1; I.ht = t; I.env.rig = rig || null; draw(I, now(), true); };
+    I.release = function () { I.held = 0; I.env.rig = null; kick(); };
     el.addEventListener('click', I.onTap); el.addEventListener('pointerenter', I.on); el.addEventListener('pointerleave', I.off); el.addEventListener('focusin', I.on); el.addEventListener('focusout', I.off);
     el.__db = I; LIVE.push(I);
     colours(I); size(I);
@@ -609,7 +616,7 @@ if (DOC) (function () {
     return I;
   }
   function running(I) {
-    if (calm()) return false;
+    if (I.held || calm()) return false;
     if (I.play === 'still') return false;
     if (I.play === 'hover') return I.hot;
     if (I.play === 'once') return I.ran < 1;
@@ -621,7 +628,7 @@ if (DOC) (function () {
     if (run) { I.clock += dt; if (I.play === 'once') I.ran += dt / loop; }
     var tap = -1, tl = (def.tapLen || 1);
     if (I.tap0 >= 0) { tap = (tn - I.tap0) / 1000 / tl; if (tap >= 1) { tap = -1; I.tap0 = -1; if (I.burstM) { I.burstM = 0; size(I); } } }
-    var st = def.still == null ? 0.25 : def.still, c = calm(), t = c || (I.play === 'once' && I.ran >= 1) || (!run && I.clock === 0) ? st : frac(I.clock / loop + st);
+    var st = def.still == null ? 0.25 : def.still, c = calm(), t = I.held ? frac(I.ht) : c || (I.play === 'once' && I.ran >= 1) || (!run && I.clock === 0) ? st : frac(I.clock / loop + st);
     if (c && tap >= 0) tap = def.tapRest == null ? 0.5 : def.tapRest;
     var fi = Math.floor((tn / 1000) * 24), boil = (run || tap >= 0) && !c ? Math.floor(tn / 125) % 3 : 0;
     if (!force && fi === I.last) return;
@@ -5897,24 +5904,33 @@ function feather(p, x, y, ang, len, ph, small) {
     var sp = bez([0, 0], [-len * 0.18, -len * 0.42], [-len * 0.5, -len * 0.78], [-len * 0.95, -len * 0.82], 14), n = sp.length;
     var h = Math.atan2(sp[n - 1][1] - sp[n - 2][1], sp[n - 1][0] - sp[n - 2][0]), st = Math.hypot(sp[n - 1][0] - sp[n - 2][0], sp[n - 1][1] - sp[n - 2][1]), q = sp[n - 1].slice(), k, curl = 0.42 + 0.05 * Math.sin(TAU * ph);
     for (k = 0; k < 18; k++) { h -= curl; st *= 0.9; q = [q[0] + Math.cos(h) * st, q[1] + Math.sin(h) * st]; sp.push(q); }
-    tube(p, sp, function (s) { return 8 * Math.pow(1 - s, 0.85) + 0.9; }, { fill: 'black' });
+    var w0 = Math.min(8, 0.4 * len);
+    tube(p, sp, function (s) { return w0 * Math.pow(1 - s, 0.85) + 0.9; }, { fill: 'black' });
     if (!small) p.curve(sp.slice(3, sp.length - 3), { ink: 'a', w: 0.5, wob: 0.4 });
   });
 }
 /* a raised wing from the shoulder, white flight feathers at its tip; k 0..1 how far it has opened */
+function wingShape(p, far) {
+  p.path('M0 0 C-4 -20 -22 -36 -46 -38 C-40 -31 -38 -25 -40 -18 C-33 -16 -29 -9 -31 -2 C-20 -3 -9 -1 0 0 Z', { fill: far ? 'night' : 'black', w: 0.7 });
+  [[-41, -31, 0.5], [-37, -22, 0.35], [-34, -13, 0.2], [-27, -6, 0.1]].forEach(function (f) { p.ellipse(f[0], f[1], 5.2, 2.2, { fill: 'white', w: 0.4, rot: f[2] }); });
+}
 function swanWing(p, x, y, ang, k, far) {
   if (k < 0.02) return;
-  p.at(x, y, ang, k, function () {
-    p.path('M0 0 C-4 -20 -22 -36 -46 -38 C-40 -31 -38 -25 -40 -18 C-33 -16 -29 -9 -31 -2 C-20 -3 -9 -1 0 0 Z', { fill: far ? 'night' : 'black' });
-    [[-41, -31, 0.5], [-37, -22, 0.35], [-34, -13, 0.2], [-27, -6, 0.1]].forEach(function (f) { p.ellipse(f[0], f[1], 5.2, 2.2, { fill: 'white', w: 0.5, rot: f[2] }); });
-  });
+  p.at(x, y, ang, k, function () { wingShape(p, far); });
+}
+/* a wing beating in flight, seen from the side: it beats across the line of sight, so it shows long when it is up or
+   down and short as it passes level. e its elevation, −1 straight down .. 1 straight up; k its length; sw leans it back */
+function flyWing(p, x, y, e, k, sw, far) {
+  if (k < 0.02) return;
+  var ey = e < 0 ? Math.min(-0.16, e) : Math.max(0.16, e);
+  p.at(x, y, sw - 0.2, [k, k * ey], function () { p.pivot(0, 0, 0.88, 1, function () { wingShape(p, far); }); });
 }
 /* one red eye, k its height (a blink) */
 function swanEye(p, x, y, k) { p.at(x, y, 0, [1, Math.max(0.1, k)], function () { p.dot(0, 0, 1.9, 'red'); p.dot(0.5, -0.5, 0.65, 'white'); }); }
 /* the head at its own origin, facing +x; turn 0 in profile, 1 looking straight at you; open 0..1 the bill open (a honk) */
 function swanHead(p, turn, blink, small, open) {
   var side = 1 - turn, k = 1 - blink, op = open || 0;
-  p.ellipse(0, 0, 7.6 - 1.4 * turn, 5.6 + 0.8 * turn, { fill: 'black', rot: -0.12 * side });
+  p.ellipse(0, 0, 7 - 1.2 * turn, 4.9 + 1.2 * turn, { fill: 'black', rot: -0.16 * side });
   if (side > 0.02) p.pivot(4.6, 0, 0, [Math.max(0.02, side), 1], function () {
     if (op > 0.02) {
       p.pivot(4.6, 1.6, 0.5 * op, 1, function () { p.path('M4.6 1.2 L16.8 3 C16.6 4.8 13.8 5.4 11.6 5.1 L4.6 3.8 Z', { fill: 'red', w: 0.8 }); });
@@ -5934,35 +5950,43 @@ function swanHead(p, turn, blink, small, open) {
   if (turn > 0.35) swanEye(p, 3.1, -1.7, k);
 }
 /* a black leg from the hip (hx, hy) to the ankle (ax, ay), and its webbed foot at angle fa; spread 0 folded, 1 open */
-function swanLeg(p, hx, hy, ax, ay, fa, spread, far, big) {
-  var c = far ? 'night' : 'black', s = 0.22 + 0.78 * spread, k = big || 1;
-  p.line(hx, hy, ax, ay, { w: 1.7 * k, ink: c, cap: 'round' });
-  p.at(ax, ay, fa, k, function () { p.path('M-1.6 0 L10.5 ' + (-4.8 * s) + ' Q13.4 0 10.5 ' + (4.8 * s) + ' Z', { fill: c, w: 0.6 }); if (spread > 0.6 && !p.small) { p.line(1, 0, 10, -2.6 * s, { ink: 'grey', w: 0.35 }); p.line(1, 0, 10, 2.6 * s, { ink: 'grey', w: 0.35 }); } });
+function swanLeg(p, hx, hy, ax, ay, fa, spread, far, big, alpha) {
+  var c = far ? 'night' : 'black', s = 0.22 + 0.78 * spread, k = big || 1, al = alpha == null ? 1 : alpha;
+  p.line(hx, hy, ax, ay, { w: 1.7 * k, ink: c, cap: 'round', alpha: al });
+  p.at(ax, ay, fa, k, function () { p.path('M-1.6 0 L10.5 ' + (-4.8 * s) + ' Q13.4 0 10.5 ' + (4.8 * s) + ' Z', { fill: c, w: 0.6, alpha: al }); if (spread > 0.6 && !p.small) { p.line(1, 0, 10, -2.6 * s, { ink: 'grey', w: 0.35, alpha: al }); p.line(1, 0, 10, 2.6 * s, { ink: 'grey', w: 0.35, alpha: al }); } });
 }
-var SW_BODY = 'M-31 -3 C-25 -16 0 -19 18 -12 C28 -8 34 -2 32 6 C28 14 8 18 -12 16 C-24 14 -33 6 -31 -3 Z';
+/* the body: a long low boat, the tail end raised and pointed, a full breast, a flat keel. A swan stands low on short
+   legs set far back (a long neck on a body raised on long legs reads as an ostrich: Michael, 2026-10-24) */
+var SW_BODY = 'M-40 -7 C-31 -15 -9 -18 11 -15 C25 -13 35 -6 34 3 C33 11 20 16 2 16 C-16 16 -31 10 -40 -7 Z';
+/* the poses give a standing body's centre at y 66; it is drawn this much lower, so the legs show short */
+var SW_DY = 4;
+/* where the feet stand, from the body's centre: near, far */
+var SW_FN = -1, SW_FF = -11;
+/* where a leg meets the body, in the box: set back from the middle, the far one further back */
+function swHip(o, far) { var hx = far ? -12 : -6, hy = 11, a = o.tilt || 0, c = Math.cos(a), s = Math.sin(a); return [o.x + hx * c - hy * s, o.y + SW_DY + hx * s + hy * c]; }
 /* the whole bird. o: x y (body centre), tilt (+ nose down), neck 0 upright, 1 diving, look, blink, wings 0..1, flap,
    head (extra head angle), legs(p, behind) draws the legs in the body frame, sway (feather wag), t (feather curl),
-   open (the bill, a honk); or N, a pose from NK below, for the neck and head instead of neck and look */
+   open (the bill, a honk); or N, a pose from NK below, for the neck and head instead of neck and look;
+   wing(p, far) draws the wings instead (in flight) */
 function swan(p, o) {
   var neck = o.neck || 0, look = o.look || 0, wings = o.wings || 0, flap = o.flap || 0, N = o.N;
-  var H = N ? N.H : [M.lerp(38 + 2 * look, 41, neck) + (o.reach || 0), M.lerp(-46 + 2 * look - 4 * wings, 4, neck)];
-  var C1 = N ? N.C1 : [M.lerp(37, 32, neck), M.lerp(-18, -8, neck)], C2 = N ? N.C2 : [M.lerp(24, 39, neck), M.lerp(-36, -5, neck)];
+  if (!N) { N = nk(nk(NK.rest, NK.at, look), NK.dive, neck); N.H = [N.H[0] + (o.reach || 0), N.H[1] - 4 * wings * (1 - neck)]; }
   /* face 1 the head in profile facing forward, 0 at you, -1 in profile facing back over its shoulder */
-  var face = N ? N.face : 1 - look, ha = (N ? N.a : M.lerp(0, 1.15, neck) + 0.12 * look) + (o.head || 0);
-  p.at(o.x, o.y, o.tilt || 0, o.k || 1, function () {
-    swanWing(p, 6, -12, 0.55 + flap * 0.55, wings * 1.15, true);
+  var face = N.face, ha = N.a + (o.head || 0);
+  p.at(o.x, o.y + SW_DY, o.tilt || 0, o.k || 1, function () {
+    if (o.wing) o.wing(p, true); else swanWing(p, 4, -13, 0.55 + flap * 0.55, wings * 1.15, true);
     if (o.legs) o.legs(p, true);
     var sw = o.sway || 0;
-    feather(p, -18, -6, 0.02 + sw, 21, o.t || 0, p.small);
-    feather(p, -9, -10, 0.26 + sw * 0.8, 26, (o.t || 0) + 0.3, p.small);
-    feather(p, 0, -11, 0.5 + sw * 0.6, 18, (o.t || 0) + 0.6, p.small);
+    feather(p, -27, -8, -0.42 + sw, 15, o.t || 0, p.small);
+    feather(p, -17, -12, -0.2 + sw * 0.8, 18, (o.t || 0) + 0.3, p.small);
+    feather(p, -6, -14, 0.02 + sw * 0.6, 13, (o.t || 0) + 0.6, p.small);
     p.path(SW_BODY, { fill: 'black' });
-    if (!p.small && wings < 0.3) p.path('M-17 -1 C-13 -4 -9 -3 -6 -1 C-3 -4 1 -3 4 0 C7 -3 11 -2 14 1', { ink: 'grey', w: 0.5, detail: true });
+    if (!p.small && wings < 0.3 && !o.wing) p.path('M-25 -4 C-20 -7 -15 -6 -11 -4 C-7 -7 -2 -6 2 -3 C6 -6 10 -5 14 -2', { ink: 'grey', w: 0.5, detail: true });
     if (o.legs) o.legs(p, false);
-    var sp = bez([24, -8], C1, C2, H, 16), n = sp.length;
-    tube(p, sp, function (s) { return 11 - 4.6 * s; }, { fill: 'black' });
-    p.at(H[0], H[1], ha, face < 0 ? [-1, 1] : 1, function () { swanHead(p, 1 - Math.abs(face), o.blink || 0, p.small, o.open); });
-    swanWing(p, 2, -10, 0.75 + flap * 0.65, wings * 1.2, false);
+    var sp = bez([25, -9], N.C1, N.C2, N.H, 18);
+    tube(p, sp, function (s) { return 10.6 - 4.6 * Math.pow(s, 0.8); }, { fill: 'black', w: 0.7 });
+    p.at(N.H[0], N.H[1], ha, face < 0 ? [-1, 1] : 1, function () { swanHead(p, 1 - Math.abs(face), o.blink || 0, p.small, o.open); });
+    if (o.wing) o.wing(p, false); else swanWing(p, 0, -11, 0.75 + flap * 0.65, wings * 1.2, false);
   });
 }
 D.add('hongsa', {
@@ -5985,12 +6009,12 @@ D.add('hongsa', {
       flap = rear * Math.sin(TAU * 3 * seg(q, 0.38, 0.88));
     }
     var pad = TAU * 20 * t, kick = dive > 0.5 ? TAU * 36 * t : pad;
-    var x = 54, y = 68 + 1.1 * M.wave(t, 5) - 10 * dive - 13 * rear;
+    var x = 54, y = 64 + 1.1 * M.wave(t, 5) - 10 * dive - 13 * rear;
     if (!p.small) for (i = 0; i < 2; i++) { var u = M.frac(t * 5 + i / 2); p.ellipse(x + 30, W + 1, 6 + 16 * u, 1.4 + 2.2 * u, { ink: 'sky', w: 0.6, alpha: 0.85 * (1 - u) * (1 - dive), fill: false }); }
     swan(p, {
       x: x, y: y, tilt: 0.85 * dive - 0.38 * rear, neck: dive, look: look, blink: Math.min(1, blink), wings: rear, flap: flap, head: 0.25 * shake, sway: 0.04 * M.wave(t, 5, 0.1), t: t,
       legs: function (p, far) {
-        var ph = far ? kick + Math.PI : kick, a = 0.5 + 0.42 * Math.sin(ph), power = Math.cos(ph) > 0 ? 1 : 0.15, hx = far ? 2 : 6, hy = 12;
+        var ph = far ? kick + Math.PI : kick, a = 0.5 + 0.42 * Math.sin(ph), power = Math.cos(ph) > 0 ? 1 : 0.15, hx = far ? -12 : -6, hy = 11;
         if (rear > 0.3) { a = 0.15 + 0.3 * Math.sin(ph * 1.5); power = 1; }
         var ax = hx - 15 * Math.sin(a), ay = hy + 15 * Math.cos(a);
         swanLeg(p, hx, hy, ax, ay, -0.25 + 0.6 * Math.sin(ph) * (1 - rear), power, far);
@@ -6022,8 +6046,8 @@ D.add('hongsa-walk', {
       var u = M.frac(t + (far ? 0.5 : 0)), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5;
       var fx = st ? M.lerp(10, -10, v) : M.lerp(-10, 10, ez(v)), lift = st ? 0 : 6 * M.bump(v);
       fx *= go; lift *= go;
-      var hx = (far ? -4 : 0), hy = 13, c = Math.cos(roll - 0.14), sn = Math.sin(roll - 0.14);
-      return { hx: x + hx * c - hy * sn, hy: y + hx * sn + hy * c, ax: x - 1 + fx, ay: G - 1.5 - lift, fa: st || !go ? 0 : 0.55 * M.bump(v), spread: st ? 1 : 0.3 + 0.7 * (1 - go) };
+      var h = swHip({ x: x, y: y, tilt: roll - 0.14 }, far);
+      return { hx: h[0], hy: h[1], ax: x - 6 + fx + (far ? -2 : 0), ay: G - 2.6 - lift, fa: st || !go ? 0 : 0.55 * M.bump(v), spread: st ? 0.45 : 0.3 + 0.15 * (1 - go) };
     };
     var legs = function (far) { var f = foot(far); swanLeg(p, f.hx, f.hy, f.ax, f.ay, f.fa, f.spread, far, 1.4); };
     legs(true);
@@ -6045,8 +6069,8 @@ D.add('hongsa-stand', {
     var x = 54, y = 66 + 0.8 * M.wave(t, 7) - 3 * wings;
     p.ellipse(x + 2, G + 0.5, 20, 2.6, { fill: 'smoke', line: false, alpha: 0.55 });
     var legs = function (far) {
-      var hx = x + (far ? -4 : 1), hy = y + 13, ax = x + (far ? -7 : 4) + 3 * step * (far ? 0 : 1) - 3 * step2 * (far ? 1 : 0), lift = 5 * (far ? step2 : step);
-      swanLeg(p, hx, hy, ax, G - 1.5 - lift, lift > 0.5 ? 0.35 : 0, lift > 0.5 ? 0.4 : 1, far, 1.4);
+      var h = swHip({ x: x, y: y, tilt: -0.14 - 0.22 * wings }, far), ax = x + (far ? SW_FF : SW_FN) + 3 * step * (far ? 0 : 1) - 3 * step2 * (far ? 1 : 0), lift = 5 * (far ? step2 : step);
+      swanLeg(p, h[0], h[1], ax, G - 2.6 - lift, lift > 0.5 ? 0.35 : 0, lift > 0.5 ? 0.3 : 0.45, far, 1.4);
     };
     legs(true);
     swan(p, { x: x, y: y, tilt: -0.14 - 0.22 * wings, look: look, blink: blink, wings: wings, flap: flap, sway: 0.05 * M.wave(t, 7, 0.2), t: t });
@@ -6060,16 +6084,21 @@ D.add('hongsa-stand', {
    Poses of the neck and head for swan(o.N), in the body frame: H the head, C1 C2 the neck's curve up from the
    chest, a the head's angle, face 1 forward, 0 at you, -1 back over its shoulder. */
 var NK = {
-  rest: { H: [38, -46], C1: [37, -18], C2: [24, -36], a: 0, face: 1 },
-  up: { H: [47, -70], C1: [38, -22], C2: [30, -52], a: -1.05, face: 1 },
-  peek: { H: [41, -54], C1: [38, -20], C2: [27, -42], a: -0.62, face: 1 },
-  honk: { H: [52, -50], C1: [42, -18], C2: [35, -38], a: -0.45, face: 1 },
-  bow: { H: [46, -4], C1: [40, -18], C2: [52, -32], a: 1.45, face: 1 },
-  ground: { H: [48, 6], C1: [36, -14], C2: [52, -20], a: 1.5, face: 1 },
-  preen: { H: [-4, -20], C1: [30, -30], C2: [14, -44], a: -0.75, face: -1 },
-  tuck: { H: [-6, -17], C1: [30, -26], C2: [14, -36], a: -0.2, face: -1 },
-  nuzzle: { H: [50, -34], C1: [40, -18], C2: [54, -46], a: 1.2, face: 1 },
-  heart: { H: [33, -60], C1: [0, -28], C2: [6, -84], a: 1.35, face: 1 }
+  rest: { H: [35, -50], C1: [41, -24], C2: [17, -40], a: 0.4, face: 1 },
+  at: { H: [34, -48], C1: [41, -24], C2: [18, -40], a: 0.08, face: 0 },
+  dive: { H: [43, 6], C1: [34, -8], C2: [41, -4], a: 1.2, face: 1 },
+  up: { H: [46, -70], C1: [40, -26], C2: [30, -54], a: -0.95, face: 1 },
+  peek: { H: [41, -58], C1: [41, -25], C2: [24, -46], a: -0.35, face: 1 },
+  honk: { H: [53, -48], C1: [43, -20], C2: [34, -40], a: -0.4, face: 1 },
+  bow: { H: [48, -4], C1: [43, -20], C2: [55, -34], a: 1.45, face: 1 },
+  ground: { H: [50, 7], C1: [38, -16], C2: [55, -22], a: 1.5, face: 1 },
+  preen: { H: [-6, -21], C1: [31, -32], C2: [13, -46], a: -0.75, face: -1 },
+  tuck: { H: [-8, -18], C1: [31, -28], C2: [13, -38], a: -0.2, face: -1 },
+  nuzzle: { H: [51, -32], C1: [42, -20], C2: [57, -46], a: 1.2, face: 1 },
+  heart: { H: [33, -60], C1: [0, -28], C2: [6, -84], a: 1.35, face: 1 },
+  /* hurrying: the neck reaches forward; flying: straight out in front, the head level */
+  hurry: { H: [52, -38], C1: [42, -16], C2: [37, -34], a: 0.18, face: 1 },
+  fly: { H: [70, -15], C1: [42, -12], C2: [56, -15], a: 0.1, face: 1 }
 };
 function nk(A, B, u) {
   var L = M.lerp, f = function (a, b) { return [L(a[0], b[0], u), L(a[1], b[1], u)]; };
@@ -6081,10 +6110,10 @@ function standing(p, o, ft) {
   var G = 93, x = o.x, y = o.y, air = ft.air || 0;
   p.ellipse(x + 2, G + 0.5, 20 * (1 - 0.4 * air), 2.6, { fill: 'smoke', line: false, alpha: 0.55 * (1 - 0.4 * air) });
   var leg = function (far) {
-    var lift = 5 * (far ? ft.step2 || 0 : ft.step || 0), hx = x + (far ? -4 : 1), hy = y + 13;
-    var ax = far ? (ft.fx != null ? ft.fx : x - 7) : (ft.nx != null ? ft.nx : x + 4), ay = G - 1.5 - lift;
+    var lift = 5 * (far ? ft.step2 || 0 : ft.step || 0), h = swHip(o, far), hx = h[0], hy = h[1];
+    var ax = far ? (ft.fx != null ? ft.fx : x + SW_FF) : (ft.nx != null ? ft.nx : x + SW_FN), ay = G - 2.6 - lift;
     if (air > 0) { ax = M.lerp(ax, hx - 7, air); ay = M.lerp(ay, hy + 10, air); }
-    swanLeg(p, hx, hy, ax, ay, air > 0.2 ? 0.8 * air : lift > 0.5 ? 0.35 : 0, air > 0.2 || lift > 0.5 ? 0.4 : 1, far, 1.4);
+    swanLeg(p, hx, hy, ax, ay, air > 0.2 ? 0.8 * air : lift > 0.5 ? 0.35 : 0, air > 0.2 || lift > 0.5 ? 0.3 : 0.45, far, 1.4);
   };
   leg(true); swan(p, o); leg(false);
 }
@@ -6092,7 +6121,7 @@ function standing(p, o, ft) {
 function swanTap(o, s) {
   if (s.tap < 0) return;
   var q = s.tap, seg = M.seg, ez = M.ease, k = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1)));
-  o.N = nk(o.N || NK.rest, { H: [40, -44], C1: NK.rest.C1, C2: NK.rest.C2, a: 0.1, face: 0 }, k);
+  o.N = nk(o.N || NK.rest, NK.at, k);
   o.open = Math.max(o.open || 0, M.bump(seg(q, 0.14, 0.32)));
   o.wings = Math.max(o.wings || 0, ez(seg(q, 0.25, 0.38)) * (1 - ez(seg(q, 0.78, 0.92))));
   o.flap = o.wings * Math.sin(TAU * 2.5 * seg(q, 0.3, 0.85));
@@ -6203,8 +6232,8 @@ D.add('hongsa-court', mv({
     N.H = [N.H[0], N.H[1] + 1.2 * sway];
     var o = { x: bx, y: 66 + 1.5 * arch, tilt: -0.14 + 0.08 * arch, N: N, blink: Math.min(1, ez(seg(t, 0.36, 0.4)) * (1 - ez(seg(t, 0.72, 0.76)))), sway: 0.05 * sway, t: t };
     swanTap(o, s);
-    var nf = M.lerp(x0 + 4, x1 + 4, ez(seg(go, 0, 0.5))), ff = M.lerp(x0 - 7, x1 - 7, ez(seg(go, 0.5, 1)));
-    standing(p, o, { nx: M.lerp(nf, bx + 4, back), fx: M.lerp(ff, bx - 7, back), step: bump(seg(go, 0, 0.5)) + bump(seg(t, 0.9, 0.945)), step2: bump(seg(go, 0.5, 1)) + bump(seg(t, 0.945, 0.99)) });
+    var nf = M.lerp(x0 + SW_FN, x1 + SW_FN, ez(seg(go, 0, 0.5))), ff = M.lerp(x0 + SW_FF, x1 + SW_FF, ez(seg(go, 0.5, 1)));
+    standing(p, o, { nx: M.lerp(nf, bx + SW_FN, back), fx: M.lerp(ff, bx + SW_FF, back), step: bump(seg(go, 0, 0.5)) + bump(seg(t, 0.9, 0.945)), step2: bump(seg(go, 0.5, 1)) + bump(seg(t, 0.945, 0.99)) });
     rise(p, 'heart', 120, -2, seg(t, 0.34, 0.74), 0, 'red', true);
   }
 }));
@@ -6233,7 +6262,7 @@ D.add('hongsa-idle', {
     var seg = M.seg, ez = M.ease, bump = M.bump, w = function (a, b, e) { e = e || 0.012; return ez(seg(t, a, a + e)) * (1 - ez(seg(t, b - e, b))); };
     var look = w(0.06, 0.15, 0.01), preen = w(0.19, 0.33), graze = w(0.37, 0.47), stretch = w(0.51, 0.59, 0.01), honk = w(0.63, 0.69, 0.008), doze = w(0.73, 0.88, 0.02), shake = bump(seg(t, 0.885, 0.915));
     var N = NK.rest;
-    N = nk(N, { H: [40, -44], C1: NK.rest.C1, C2: NK.rest.C2, a: 0.1, face: 0 }, look);
+    N = nk(N, NK.at, look);
     N = nk(N, NK.preen, preen); N = nk(N, NK.ground, graze); N = nk(N, NK.peek, 0.6 * stretch); N = nk(N, NK.honk, honk); N = nk(N, NK.tuck, doze);
     var nib = preen * Math.sin(TAU * 9 * seg(t, 0.21, 0.31)), peck = graze * (bump(seg(t, 0.39, 0.42)) + bump(seg(t, 0.43, 0.46)));
     N.H = [N.H[0] + 1.5 * nib, N.H[1] + 1.5 * nib + 4 * peck];
@@ -6245,6 +6274,138 @@ D.add('hongsa-idle', {
     standing(p, o, { step: bump(seg(t, 0.92, 0.95)), step2: bump(seg(t, 0.95, 0.98)) });
     if (!p.small && doze > 0.5) [0, 1, 2].forEach(function (i) { var u = M.frac((t - 0.75) * 9 + i / 3); p.at(36 + 6 * u + 4 * i, 18 - 26 * u, 0, 0.5 + 0.4 * u, function () { p.path('M-3 -3 L3 -3 L-3 3 L3 3', { w: 0.9, alpha: (doze - 0.5) * 2 * M.bump(u) }); }); });
     rise(p, 'note', 126, 6, seg(t, 0.645, 0.7), 0);
+  }
+});
+/* The swan on the move (her word 2026-10-24: the job-line swans "need to be more lifelike and follow physics better.
+   Walking or swimming or flying."). The page that moves the swan (hongdam.net shop.js) works out where it is, how fast,
+   and where each foot is planted, and passes the pose as s.rig every frame; alone it walks on the spot. A rig, every
+   length in this box's units (100 high):
+     water  the line it is on is water (wy its surface, lw how thick it is drawn); w 0 out of it .. 1 afloat
+     alt    how far the body has risen (taking off, flying); bob, tilt, roll  the body's give
+     ft     [[dx, lift, foot angle, spread] near foot, [..] far foot] while it steps: dx from the body's centre
+     pad    the paddle stroke while it swims, in strokes; tuck 0..1 legs folded back to fly; fwd 0..1 reaching to land
+     hurry, fly  0..1: the neck reaching forward, then straight out
+     wo we wk wsw  wings open 0..1, their elevation −1 down .. 1 up, their length, how far they lean back
+     look blink open  the head; act {k: dip | rear | look | honk | court | nuzzle, u: 0..1} something it does afloat
+     v      its speed (a bow wave); rip [[dx, age 0..1]] ripples it left; spl [[dx, age s, size, on land]] splashes or dust */
+/* body frame → box, for a swan drawn by swan(o) */
+function swBox(o, px, py) { var a = o.tilt || 0, c = Math.cos(a), s = Math.sin(a); return [o.x + px * c - py * s, o.y + SW_DY + px * s + py * c]; }
+/* drops thrown up from (x, y), falling back, age in seconds */
+function drops(p, x, y, age, size, colour, seed) {
+  if (age < 0 || age > 0.6 || p.small) return;
+  var R = M.rng(seed || 7), n = 5, j;
+  for (j = 0; j < n; j++) {
+    var vx = (j - (n - 1) / 2) * 26 * size * (0.7 + 0.6 * R()), vy = (55 + 40 * R()) * size, dy = -vy * age + 190 * age * age;
+    if (dy > 2) continue;
+    p.dot(x + vx * age, y + dy, 1.5 * (1 - age / 0.7) * Math.max(0.6, size), colour);
+  }
+}
+/* what the water shows: ripples spreading behind, the bow wave, splashes; on land, dust */
+function waterMarks(p, r, X, top, G) {
+  if (p.small) return;
+  if (r.water) (r.rip || []).forEach(function (q) {
+    var a = q[1], hw = 3 + 15 * a, cx = X + q[0], y = top + 2.4 * a, h = 2.4 * (1 - 0.7 * a);
+    p.curve([[cx - hw, y], [cx - hw * 0.45, y - h], [cx + hw * 0.45, y - h], [cx + hw, y]], { ink: 'c', w: 0.95 - 0.45 * a, wob: 0.4 });
+  });
+  if (r.water && (r.w || 0) > 0.5 && r.v > 15) { var bw = Math.min(1, (r.v - 15) / 110); p.curve([[X + 28, top + 0.5], [X + 37, top - 1 - 3 * bw], [X + 44 + 7 * bw, top + 0.5]], { ink: 'c', w: 0.9, wob: 0.4 }); }
+  (r.spl || []).forEach(function (q, i) { drops(p, X + q[0], q[3] ? G : top, q[1], q[2], q[3] ? 'smoke' : 'c', 31 + i * 7 + Math.round(q[0])); });
+}
+function goSwan(p, t, s, r) {
+  var G = 93, X = 54, W = r.wy == null ? 93 : r.wy - (r.lw || 15) / 2, w = r.w || 0, alt = r.alt || 0, fly = r.fly || 0, A = r.act, seg = M.seg, ez = M.ease, bump = M.bump;
+  /* W: the water's surface, the top of the line it swims in; afloat, a quarter of the body is under it */
+  var o = { x: X, y: M.lerp(66, W - 12, w) - alt - (r.bob || 0), tilt: M.lerp(M.lerp(-0.14, -0.05, w), 0.04, fly) + (r.tilt || 0) + (r.roll || 0), blink: r.blink || 0, open: r.open || 0, sway: r.sway || 0, t: t };
+  var N = NK.rest, pad = r.pad, kick = 1, after = null;
+  if (r.hurry) N = nk(N, NK.hurry, r.hurry);
+  if (fly) N = nk(N, NK.fly, fly);
+  if (r.look) N = nk(N, NK.at, r.look);
+  if (r.preen) { N = nk(N, NK.preen, r.preen); var nb = r.preen * Math.sin(TAU * 7 * t); N.H = [N.H[0] + 1.5 * nb, N.H[1] + 1.5 * nb]; }
+  if (A) {
+    var u = A.u;
+    if (A.k === 'dip') {   /* up-ends: the head goes down under the water, the tail and feet come up, the feet kick */
+      var dv = ez(seg(u, 0.06, 0.28)) * (1 - ez(seg(u, 0.7, 0.92)));
+      N = nk(N, NK.dive, dv); o.tilt += 0.85 * dv; o.y -= 10 * dv; pad = u * 10; kick = 1 + 0.6 * dv;
+      after = function () { drops(p, X + 30, W, (u - 0.2) * 2.4, 0.8, 'c', 5); drops(p, X + 26, W, (u - 0.74) * 2.4, 0.9, 'c', 9); };
+    } else if (A.k === 'rear') {   /* rises up on the water and beats its wings */
+      var rr = ez(seg(u, 0.06, 0.2)) * (1 - ez(seg(u, 0.8, 0.95)));
+      N = nk(N, NK.peek, 0.6 * rr); o.y -= 13 * rr; o.tilt -= 0.4 * rr; o.wings = rr; o.flap = rr * Math.sin(TAU * 3 * seg(u, 0.18, 0.82)); pad = u * 8; kick = 1.4;
+      after = function () { var k; for (k = 0; k < 3; k++) drops(p, X - 14 + 12 * k, W, (u - 0.3 - 0.1 * k) * 1.6, 0.7, 'c', 13 + k); };
+    } else if (A.k === 'look') {   /* turns to look at you and blinks */
+      var lk = ez(seg(u, 0.05, 0.2)) * (1 - ez(seg(u, 0.75, 0.92)));
+      N = nk(N, NK.at, lk); o.blink = Math.min(1, bump(seg(u, 0.38, 0.45)) + bump(seg(u, 0.5, 0.57)));
+    } else if (A.k === 'honk') {   /* stretches its neck forward and honks twice */
+      var st = ez(seg(u, 0.04, 0.2)) * (1 - ez(seg(u, 0.78, 0.94))), h1 = bump(seg(u, 0.24, 0.4)), h2 = bump(seg(u, 0.46, 0.62));
+      N = nk(N, NK.honk, st); N.H = [N.H[0] + 3 * (h1 + h2), N.H[1] - 2 * (h1 + h2)]; o.open = Math.min(1, h1 + h2);
+      after = function () { rise(p, 'note', X + 70, o.y - 60, seg(u, 0.26, 0.7), 0); rise(p, 'note', X + 76, o.y - 58, seg(u, 0.48, 0.92), 1); };
+    } else if (A.k === 'court') {   /* glides up to its mate, arches its neck and bows until the bills touch: a heart */
+      var go = ez(seg(u, 0.02, 0.2)) * (1 - ez(seg(u, 0.9, 0.99))), arch = ez(seg(u, 0.2, 0.34)) * (1 - ez(seg(u, 0.8, 0.9))), sv = Math.sin(TAU * 2 * seg(u, 0.34, 0.8)) * arch;
+      o.x += 30 * go; N = nk(N, NK.heart, arch); N.H = [N.H[0], N.H[1] + 1.2 * sv]; o.blink = Math.min(1, ez(seg(u, 0.36, 0.4)) * (1 - ez(seg(u, 0.72, 0.76))));
+      pad = u * 6;
+      after = function () { rise(p, 'heart', X + 66, o.y - 68, seg(u, 0.34, 0.74), 0, 'red', true); };
+    } else if (A.k === 'nuzzle') {   /* bends its neck down to Dam in front of it and nuzzles it twice */
+      var b = ez(seg(u, 0.06, 0.28)) * (1 - ez(seg(u, 0.74, 0.92))), nz = bump(seg(u, 0.32, 0.44)) + bump(seg(u, 0.48, 0.6));
+      N = nk(N, NK.nuzzle, b); N.H = [N.H[0] + 1.5 * nz, N.H[1] + 3 * nz]; N.a += 0.12 * nz; o.blink = 0.6 * ez(seg(u, 0.3, 0.34)) * (1 - ez(seg(u, 0.62, 0.66)));
+      after = function () { rise(p, 'heart', X + 58, o.y - 58, seg(u, 0.38, 0.84), 0, 'red'); };
+    }
+  }
+  o.N = N;
+  swanTap(o, s);
+  if ((r.wo || 0) > 0.02 && !o.wings) o.wing = function (pp, far) { flyWing(pp, far ? 3 : -1, far ? -15 : -12, r.we || 0, r.wo * (r.wk || 1.1), (r.wsw || 0) + (far ? -0.1 : 0), far); };
+  var onWater = w > 0.5, ank = onWater ? W - 1 : G - 2.6;
+  if (onWater && pad == null && !r.ft) pad = t * 2;
+  function leg(far) {
+    var h = swHip(o, far), a, fa = 0, sp = 0.45, tilt = o.tilt;
+    if (r.ft) { var f = r.ft[far ? 1 : 0]; a = [X + f[0], ank - f[1]]; fa = f[2] || 0; sp = f[3] == null ? 0.45 : f[3]; }
+    else if (pad != null) {   /* paddling: each foot sweeps back open and comes forward folded, one after the other */
+      var ph = TAU * pad + (far ? Math.PI : 0), an = 0.5 + 0.42 * Math.sin(ph) * kick, L = 15;
+      a = swBox(o, (far ? -12 : -6) - L * Math.sin(an), 11 + L * Math.cos(an)); fa = -0.25 + 0.6 * Math.sin(ph) + tilt; sp = Math.cos(ph) > 0 ? 1 : 0.15;
+    } else a = [X + (far ? SW_FF : SW_FN), ank];
+    if (r.tuck) { var T = swBox(o, far ? -37 : -33, far ? 8 : 11); a = [M.lerp(a[0], T[0], r.tuck), M.lerp(a[1], T[1], r.tuck)]; fa = M.lerp(fa, Math.PI + tilt + 0.15, r.tuck); sp = M.lerp(sp, 0.2, r.tuck); }
+    if (r.fwd) { var F = swBox(o, far ? 8 : 14, far ? 23 : 26); a = [M.lerp(a[0], F[0], r.fwd), M.lerp(a[1], F[1], r.fwd)]; fa = M.lerp(fa, -0.45, r.fwd); sp = M.lerp(sp, 1, r.fwd); }
+    if (!r.water || !onWater) a[1] = Math.min(a[1], r.water ? W + 2 : ank);
+    swanLeg(p, h[0], h[1], a[0], a[1], fa, sp, far, 1.55);
+  }
+  function bird() { leg(true); swan(p, o); leg(false); }
+  if (!r.water) {
+    var hi = Math.min(1, alt / 50);
+    p.ellipse(X - 3, G + 0.5, 22 * (1 - 0.5 * hi), 2.6, { fill: 'smoke', line: false, alpha: 0.55 * (1 - 0.75 * hi) });
+    bird();
+  } else {   /* under the surface it shows faint, as through the water */
+    p.clip('M-300 -300 H500 V' + W + ' H-300 Z', bird);
+    p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { var j = p.marks.length, k; bird(); for (k = j; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= 0.35; });
+  }
+  waterMarks(p, r, X, W, G);
+  if (after) after();
+}
+/* on the spot, for the gallery: it walks, its feet stepping back under it as if the ground moved */
+function goWalk(t) {
+  var L = 11;
+  return {
+    ft: [0, 1].map(function (k) {
+      var u = M.frac(t + k / 2), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5;
+      return st ? [M.lerp(L, -L, v) - 6, 0, 0, 0.45] : [M.lerp(-L, L, M.ease(v)) - 6, 6 * M.bump(v), 0.5 * M.bump(v), 0.3];
+    }),
+    bob: 2 * M.bump(M.frac(2 * t)), roll: 0.09 * Math.sin(TAU * t), sway: 0.08 * Math.sin(TAU * t + 0.5)
+  };
+}
+D.add('hongsa-go', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hongdam', 'walk', 'swim', 'fly', 'take off', 'land', 'bird', '🦢'], loop: 1, still: 0, ratio: 1.2, burst: 'note', burstAt: [96, 16], burstN: 3, burstSpread: 2.2, tapLen: 1.6, tapRest: 0.3, margin: [62, 44, 34, 74],
+  about: 'the black swan on the move, posed by the page that moves it: it walks with each foot planted where it lands, hurries with its neck out and wings half open, swims with its feet paddling under the water, runs and beats its wings to take off, flies low with its neck straight out and lands feet first; on its own it walks on the spot',
+  tapAbout: 'it looks at you, honks and flaps',
+  draw: function (p, t, s) { goSwan(p, t, s, s.rig || goWalk(t)); }
+});
+/* Afloat on a job line that is water, after its swim: it paddles gently, looks at you, preens, up-ends and comes up, and
+   bobs. The line is the water: what is under its surface is drawn faint, so the line shows through. */
+D.add('hongsa-float', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hongdam', 'float', 'swim', 'water', 'preen', 'dip', 'bird', '🦢'], loop: 16, still: 0.02, ratio: 1.2, burst: 'note', burstAt: [96, 30], burstN: 3, burstSpread: 2.2, tapLen: 1.6, tapRest: 0.3, margin: [44, 30, 34, 50],
+  about: 'the black swan afloat: it paddles gently, turns to look at you and blinks, preens, up-ends with its head under the water and its feet kicking, and comes up',
+  tapAbout: 'it looks at you, honks and flaps',
+  draw: function (p, t, s) {
+    var seg = M.seg, act = null, u;
+    if ((u = seg(t, 0.08, 0.22)) > 0 && u < 1) act = { k: 'look', u: u };
+    else if ((u = seg(t, 0.5, 0.66)) > 0 && u < 1) act = { k: 'dip', u: u };
+    var preen = M.ease(seg(t, 0.28, 0.32)) * (1 - M.ease(seg(t, 0.42, 0.46)));
+    goSwan(p, t, s, { water: 1, w: 1, pad: 6 * t, bob: 0.8 * M.wave(t, 8), sway: 0.05 * M.wave(t, 16, 0.2) + 0.08 * preen * Math.sin(TAU * 40 * t), act: act, look: 0, v: 0,
+      rip: [0, 1].map(function (i) { var a = M.frac(1.5 * t + i / 2); return [-46 - 8 * a, a]; }).concat([[38 + 5 * M.frac(1.5 * t + 0.25), M.frac(1.5 * t + 0.25)]]), preen: preen });
   }
 });
 /* Dam (ดำ), the hongsa's chick in hongdam.net's egg story (data/eggs-story.json), at three ages: 0 a ball of grey
@@ -6408,6 +6569,59 @@ D.add('duckling-wait', {
     var seg = M.seg, ez = M.ease, bump = M.bump;
     var look = ez(seg(t, 0.2, 0.25)) * (1 - ez(seg(t, 0.42, 0.47))), beak = bump(seg(t, 0.3, 0.34)), sit = ez(seg(t, 0.6, 0.64)) * (1 - ez(seg(t, 0.84, 0.9)));
     damBall(p, t, s, { go: 0, ph: 0, look: look, beak: beak, sit: sit, blink: Math.min(1, bump(seg(t, 0.1, 0.13)) + bump(seg(t, 0.36, 0.39))), hop: 1.5 * Math.abs(Math.sin(TAU * 3 * t)) * (1 - sit) * (1 - look), head: sit * (0.15 + 0.14 * Math.sin(TAU * 5 * t)) });
+  }
+});
+/* Dam on the move, posed by the page that moves it, as the swan is (hongsa-go): rig w, wy, lw, water, alt, bob, roll,
+   ft [[dx, lift, foot angle, spread] near, far], pad, look, beak, flap, rip, spl, v. Alone it trots on the spot. */
+function goDam(p, t, s, r) {
+  var G = 93, X = 46, W = r.wy == null ? 93 + (r.lw || 15) / 2 : r.wy, w = r.w || 0, look = r.look || 0, beak = r.beak || 0, flap = r.flap || 0, hop = r.alt || 0;
+  if (s.tap >= 0) {
+    var q = s.tap, ez = M.ease, seg = M.seg, tw = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1)));
+    look = Math.max(look, tw); beak = M.bump(seg(q, 0.16, 0.34)) + M.bump(seg(q, 0.4, 0.58));
+    flap = Math.abs(Math.sin(TAU * 3 * seg(q, 0.2, 0.8))) * M.bump(seg(q, 0.16, 0.84)); if (w < 0.5) hop += 5 * M.bump(seg(q, 0.18, 0.42));
+  }
+  W -= (r.lw || 15) / 2;
+  var roll = (r.roll || 0) + (r.tilt || 0), y = M.lerp(64, W - 5, w) - hop - (r.bob || 0), onWater = w > 0.5, ank = onWater ? W - 1 : G - 1.5, pad = r.pad;
+  if (onWater && pad == null && !r.ft) pad = t * 3;
+  function leg(far) {
+    var hx = 1 + (far ? -3.5 : 0), hy = 12, c = Math.cos(roll), sn = Math.sin(roll), h = [X + hx * c - hy * sn, y + hx * sn + hy * c], a, fa = 0, sp = 1;
+    if (r.ft) { var f = r.ft[far ? 1 : 0]; a = [X + f[0], ank - f[1]]; fa = f[2] || 0; sp = f[3] == null ? 1 : f[3]; }
+    else if (pad != null) { var ph = TAU * pad + (far ? Math.PI : 0), an = 0.45 + 0.4 * Math.sin(ph); a = [h[0] - 10 * Math.sin(an), h[1] + 10 * Math.cos(an)]; fa = -0.25 + 0.6 * Math.sin(ph); sp = Math.cos(ph) > 0 ? 1 : 0.2; }
+    else a = [X, ank];
+    if (!r.water || !onWater) a[1] = Math.min(a[1], r.water ? W + 2 : ank);
+    swanLeg(p, h[0], h[1], a[0], a[1], fa, sp, far, 1.25);
+  }
+  function chick() {
+    leg(true);
+    cygnet(p, { x: X, y: y, tilt: roll, age: 0, look: look, blink: r.blink || 0, beak: beak, flap: flap, head: r.head || 0, t: t });
+    leg(false);
+  }
+  if (!r.water) { p.ellipse(X + 2, G + 0.5, 17 * (1 - Math.min(0.4, hop / 30)), 2.4, { fill: 'smoke', line: false, alpha: 0.55 }); chick(); }
+  else {
+    p.clip('M-300 -300 H500 V' + W + ' H-300 Z', chick);
+    p.clip('M-300 ' + W + ' H500 V500 H-300 Z', function () { var j = p.marks.length, k; chick(); for (k = j; k < p.marks.length; k++) if (p.marks[k].alpha != null) p.marks[k].alpha *= 0.35; });
+  }
+  waterMarks(p, r, X - 8, W, G);
+}
+D.add('duckling-go', {
+  fam: 'lanna', tags: ['cygnet', 'duckling', 'chick', 'swan', 'hongdam', 'dam', 'walk', 'swim', 'hurry', 'bird', '🐣'], loop: 0.5, still: 0, ratio: 1, burst: 'note', burstAt: [70, 30], burstN: 3, burstSpread: 1.6, burstDelay: 0.2, tapLen: 1.4, tapRest: 0.35, margin: [22, 20, 30, 60],
+  about: "Dam on the move, posed by the page that moves it: it trots after its parent with each foot planted where it lands, or paddles after it on the water; on its own it trots on the spot",
+  tapAbout: 'it looks up at you, peeps and flaps its two stubs of wings',
+  draw: function (p, t, s) {
+    var L = 6;
+    goDam(p, t, s, s.rig || { bob: 2.2 * M.bump(M.frac(2 * t)), roll: 0.13 * Math.sin(TAU * t),
+      ft: [0, 1].map(function (k) { var u = M.frac(t + k / 2), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5; return st ? [M.lerp(L, -L, v), 0, 0, 1] : [M.lerp(-L, L, M.ease(v)), 5 * M.bump(v), 0.55 * M.bump(v), 0.3]; }) });
+  }
+});
+/* Dam afloat by its parent on a job line that is water: it bobs, paddles, looks up at you, peeps */
+D.add('duckling-float', {
+  fam: 'lanna', tags: ['cygnet', 'duckling', 'chick', 'swan', 'hongdam', 'dam', 'float', 'swim', 'water', 'bird', '🐣'], loop: 6, still: 0.05, ratio: 1, burst: 'note', burstAt: [70, 30], burstN: 3, burstSpread: 1.6, burstDelay: 0.2, tapLen: 1.4, tapRest: 0.35, margin: [22, 20, 30, 40],
+  about: 'Dam afloat by its parent: it bobs and paddles, looks up at you and blinks, and peeps',
+  tapAbout: 'it looks up at you, peeps and flaps its two stubs of wings',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, look = ez(seg(t, 0.2, 0.25)) * (1 - ez(seg(t, 0.42, 0.47)));
+    goDam(p, t, s, { water: 1, w: 1, pad: 9 * t, bob: 1.2 * M.wave(t, 6), look: look, beak: bump(seg(t, 0.3, 0.34)) + bump(seg(t, 0.62, 0.66)),
+      blink: Math.min(1, bump(seg(t, 0.1, 0.13)) + bump(seg(t, 0.36, 0.39))), rip: [0, 1].map(function (i) { var a = M.frac(2 * t + i / 2); return [-20 - 6 * a, a]; }) });
   }
 });
 /* a dyed easter egg in the colour a (hongdam.net tints it with the colour of the day), a white zigzag band and
@@ -9254,6 +9468,170 @@ D.add('rosette', {
     p.circle(50, 50, 2.4, { fill: 'white', line: false });
   }
 });
+})(Dingbats);
+
+/* Fete: a charity day on a lawn. First drawn for the Golf Ball Drop page (Rotary Club of Chiang Mai
+   International, 2026-10-24): a golf ball that bounces with its dimples turning, and the chalk X it
+   is dropped onto. In riso every white here is a fill, so it is the paper showing. */
+(function (D) {
+'use strict';
+var M = D.math, TAU = M.TAU, PI = Math.PI, sin = Math.sin, cos = Math.cos, seg = M.seg, eo = M.easeOut, bump = M.bump, lerp = M.lerp, frac = M.frac;
+
+/* path data for a circle and an ellipse, for the shapes that need a hole */
+function circ(x, y, r) { return 'M' + (x - r) + ' ' + y + 'A' + r + ' ' + r + ' 0 1 0 ' + (x + r) + ' ' + y + 'A' + r + ' ' + r + ' 0 1 0 ' + (x - r) + ' ' + y + 'Z'; }
+function oval(x, y, rx, ry) { return 'M' + (x - rx) + ' ' + y + 'A' + rx + ' ' + ry + ' 0 1 0 ' + (x + rx) + ' ' + y + 'A' + rx + ' ' + ry + ' 0 1 0 ' + (x - rx) + ' ' + y + 'Z'; }
+
+/* the squash a landing leaves: 1 at the contact, 0 a few frames either side of it */
+function land(d, w) { var k = Math.max(0, 1 - Math.abs(d) / w); return k * k; }
+
+/* a golf ball seen from the front, turning by `spin` radians about its upright axis. Its face is paper
+   (white fills, so it is the paper in riso); the light is from the upper left, so the shaded side is a
+   hard-edged crescent of the sky ink and the lit side a wash of sun; the dimples are small crescents
+   whose lit rim is a dot of paper; the seam is a great circle that turns with it; one number, in pink,
+   comes round on the face. Drawn about the ball's own centre. o.rows/o.cols: the lattice; o.big: how
+   much larger each dimple is drawn (a small ball needs fewer, bigger ones); o.n7: where the number
+   starts round the ball; o.small: eight big crescents only. */
+function ball(p, R, spin, o) {
+  o = o || {};
+  var rows = o.rows || 7, cols = o.cols || 12, big = o.big || 1, k = R / 20, i, j;
+  p.circle(0, 0, R, { fill: 'white', w: o.w || 1.15 });
+  p.clip(function () { p.circle(0, 0, R, { fill: 'white', line: false }); }, function () {
+    p.circle(-R * 0.28, -R * 0.3, R * 0.78, { fill: 'yellow', alpha: 0.2, line: false });
+    p.path(circ(0, 0, R * 1.03) + circ(-R * 0.25, -R * 0.3, R * 0.98), { fill: 'sky', alpha: 0.85, line: false, holes: true });
+    if (o.small) {
+      /* under 30 px: five crescents on the shaded half, each with its dark rim to the lower right, none side by side in a row; they drift a little with the spin */
+      [[0.50, -0.20], [0.14, 0.04], [0.54, 0.26], [0.12, 0.44], [0.50, 0.64]].forEach(function (d, n) {
+        var dr = sin(spin + n * 1.3) * 0.05;
+        p.arc((d[0] + dr) * R, (d[1] - dr * 0.6) * R, R * 0.26, PI / 4 - 1.0, PI / 4 + 1.0, { ink: 'blue', w: 0.62, cap: 'round' });
+      });
+      return;
+    }
+    for (i = 0; i < rows; i++) for (j = 0; j < cols; j++) {
+      var lo = ((j + (i % 2) * 0.5) / cols) * TAU + spin, la = -1.2 + i * (2.4 / (rows - 1)), cl = cos(la), px = sin(lo) * cl * R * 0.94, py = sin(la) * R * 0.94, pz = cos(lo) * cl;
+      if (pz < 0.25) continue;
+      var rr = (1.6 + 1.0 * pz) * k * big, rot = Math.atan2(py, px), zr = Math.max(0.3, pz), a0 = PI / 4 - rot;
+      /* the dimple is a dish: its shaded rim is a crescent to the lower right, its lit rim a dot of paper to the upper left */
+      p.arc(px, py, rr * zr, a0 - 0.95, a0 + 0.95, { ry: rr, rot: rot, ink: 'blue', w: 0.3 * Math.sqrt(big), cap: 'round', detail: true });
+      var qa = a0 + PI, ex = cos(qa) * rr * zr, ey = sin(qa) * rr, cr = cos(rot), sr = sin(rot);
+      p.dot(px + ex * cr - ey * sr, py + ex * sr + ey * cr, 0.55 * k * big, 'white');
+    }
+    /* the seam: a great circle, tilted, turning with the ball; only its front half shows */
+    var run = [], tilt = 0.55;
+    for (i = 0; i <= 48; i++) {
+      var a = (i / 48) * TAU, x0 = cos(a), y0 = sin(a) * cos(tilt), z0 = sin(a) * sin(tilt), xs = x0 * cos(spin) + z0 * sin(spin), zs = -x0 * sin(spin) + z0 * cos(spin);
+      if (zs > 0.02) run.push([xs * R * 0.97, y0 * R * 0.97]);
+      else { if (run.length > 2) p.curve(run, { ink: 'ink', w: 0.4, alpha: 0.4, detail: true }); run = []; }
+    }
+    if (run.length > 2) p.curve(run, { ink: 'ink', w: 0.4, alpha: 0.4, detail: true });
+    /* the number, in the warm ink, on the face while it comes round */
+    var ln = (o.n7 == null ? -0.95 : o.n7) + spin, zn = cos(ln);
+    if (zn > 0.2) p.at(sin(ln) * R * 0.78, -R * 0.1, ln * 0.25, [zn * k, k], function () { p.path('M-2.8 -3.8 L2.8 -3.8 L-0.5 4', { ink: 'pink', w: 0.85, cap: 'round', detail: true }); });
+    p.ellipse(-R * 0.4, -R * 0.45, R * 0.2, R * 0.12, { fill: 'white', line: false, rot: -0.6 });
+  });
+}
+
+/* a blade of grass: a tapered leaf, rooted at (x, g), h tall, its tip leaning by `lean` */
+function blade(p, x, g, h, lean, wd, fill) {
+  p.path('M' + (x - wd) + ' ' + g + 'Q' + (x - wd * 0.3 + lean * 0.25) + ' ' + (g - h * 0.55) + ' ' + (x + lean) + ' ' + (g - h) + 'Q' + (x + wd * 0.55 + lean * 0.35) + ' ' + (g - h * 0.45) + ' ' + (x + wd) + ' ' + g + 'Z', { fill: fill, ink: fill, w: 0.15 });
+}
+
+/* a golf ball bouncing on the grass: two different bounces a loop, a squash where it lands (and a
+   stretch as it comes down), its dimples turning as it spins. Tap: a high hop with a full spin, stars
+   where it lands. */
+D.add('golf-ball', {
+  fam: 'fete', tags: ['golf', 'ball', 'bounce', 'drop', 'sport', 'game', 'number', 'charity'], loop: 1.8, still: 0.2, tapLen: 1.3, burst: 'star', burstAt: [50, 84], burstN: 6, burstDelay: 0.75, margin: [40, 18, 10, 18],
+  about: 'a golf ball bounces twice a loop, high and then low, squashing where it lands and kicking up grass, its dimples turning', tapAbout: 'a high hop with a full spin, stars where it lands',
+  draw: function (p, t, s) {
+    var R = 20, ground = 86, ta = s.tap < 0 ? -1 : s.tap, u, h, v, sq, st, spin = (t + (s.taps || 0) * 0.37) * TAU, age = -1, flick = 0, i;
+    if (ta < 0) {
+      if (t < 0.6) { u = t / 0.6; h = 38 * 4 * u * (1 - u); v = 1 - 2 * u; st = 0.06 * Math.pow(Math.max(0, -v), 2); }
+      else { u = (t - 0.6) / 0.4; h = 17 * 4 * u * (1 - u); v = 1 - 2 * u; st = 0.05 * Math.pow(Math.max(0, -v), 2); }
+      sq = 0.09 * land(Math.min(t, 1 - t), 0.045) + 0.16 * land(t - 0.6, 0.045);
+      age = t < 0.14 ? t : (t >= 0.6 && t < 0.74 ? t - 0.6 : -1);
+    } else {
+      var a = seg(ta, 0, 0.8); h = 62 * 4 * a * (1 - a) + (ta > 0.8 ? 6 * bump(seg(ta, 0.8, 1)) : 0); spin += eo(seg(ta, 0, 0.8)) * TAU;
+      v = ta < 0.8 ? 1 - 2 * a : 0; st = 0.06 * Math.pow(Math.max(0, -v), 2); sq = 0.16 * land(ta - 0.8, 0.04); age = ta >= 0.8 ? (ta - 0.8) * 0.7 : -1;
+    }
+    st *= 1 - Math.min(1, sq * 6);
+    var sy = (1 - sq) * (1 + st), sx = (1 + sq) * (1 - st * 0.5), cy = ground - R * sy - h;
+    if (age >= 0 && age < 0.14) flick = bump(age / 0.14);
+    /* the turf, the far blades, the contact shadow */
+    p.ellipse(50, ground + 3, 33, 4, { fill: 'leaf', alpha: 0.55, line: false });
+    [[24, 12, -3.2, 1.1, 'green'], [29, 8, -1.2, 1.0, 'leaf'], [36, 10, -2.2, 1.0, 'leaf'], [71, 11, 3, 1.1, 'leaf'], [77, 7, 1.4, 1.0, 'green']].forEach(function (b) { blade(p, b[0], ground + 1, b[1], b[2], b[3], b[4]); });
+    p.ellipse(51, ground + 1.8, R * (0.92 - Math.min(0.5, h / 90)), 3.2 - Math.min(2, h / 22), { fill: 'smoke', line: false, alpha: 0.5 - Math.min(0.3, h / 150) });
+    p.at(50, cy, 0, [sx, sy], function () { ball(p, R, spin, { rows: s.px < 56 ? 5 : 7, cols: s.px < 56 ? 9 : 12, big: s.px < 56 ? 1.45 : 1, small: p.small }); });
+    /* the near blades, over the ball's foot; two flick away on a landing */
+    [[41, 6.5, -0.6, 1.1, 'leaf'], [48, 9, 0.8, 1.2, 'green'], [57, 6, 2, 1.0, 'leaf'], [63, 8.5, 3.6, 1.1, 'green']].forEach(function (b, i2) { blade(p, b[0], ground + 2, b[1], b[2] * (1 - flick * 0.9) + (i2 % 2 ? 1 : -1) * flick * 4, b[3], b[4]); });
+    /* three small arcs of dust puff out along the ground */
+    if (age >= 0 && age < 0.2) { var d = eo(age / 0.2), sc = 1 - 0.7 * seg(age, 0.08, 0.2); for (i = -1; i <= 1; i++) p.arc(50 + i * (15 + 12 * d), ground - 2 - d * (i ? 3 : 7) - (i ? 0 : 3), 3.4 * sc, PI * 1.1, PI * 1.9, { ink: 'ink', w: 0.4, alpha: 0.7, detail: true }); }
+  }
+});
+
+/* a chalk X on a patch of mown lawn, the mark the balls are dropped onto: rings ripple out from its
+   middle, a stake with tape stands at the corner. Tap: a golf ball falls onto the middle of it, hops
+   twice, and a puff of chalk dust and stars go up. */
+D.add('x-mark', {
+  fam: 'fete', tags: ['x', 'target', 'mark', 'spot', 'goal', 'aim', 'bullseye', 'golf', 'lawn', 'here'], loop: 2.4, still: 0.3, tapLen: 1.3, burst: 'star', burstAt: [50, 58], burstN: 7, burstDelay: 0.3, margin: [56, 12, 12, 12],
+  about: 'a chalk X on a lawn of mown stripes, rings rippling out from its middle, tape stirring on its stake', tapAbout: 'a golf ball drops onto the middle of the X, hops twice, chalk dust and stars go up',
+  draw: function (p, t, s) {
+    var i, k;
+    /* the lawn plane: u across (-1..1), v from the back (0) to the front (1) */
+    var gp = function (u, v) { return [50 + u * lerp(27, 45, v), lerp(42, 80, v)]; };
+    var tile = function () {
+      p.curve([[26, 42.5], [50, 41], [74, 42.5], [84, 46.5], [94, 62], [95.5, 77], [88, 82], [50, 83.2], [12, 82], [4.5, 77], [6, 62], [16, 46.5]], { close: true, fill: 'leaf', line: false });
+    };
+    p.clip(tile, function () {
+      p.poly([[0, 38], [100, 38], [100, 90], [0, 90]], { fill: 'leaf', line: false });
+      for (i = 1; i < 5; i += 2) {     /* every second stripe is leaf over sun: the mower's other pass */
+        var u0 = -1 + i * 0.4, u1 = u0 + 0.4, a = gp(u0, 0), b = gp(u1, 0), c = gp(u1, 1), d = gp(u0, 1);
+        p.poly([[a[0], a[1] - 2], [b[0], b[1] - 2], [c[0], c[1] + 3], [d[0], d[1] + 3]], { fill: 'yellow', alpha: 0.8, line: false });
+      }
+      /* rings of paper knocked out of the green, three of them, a third of a loop apart; each is made, grows outward and thins */
+      for (k = 0; k < 3; k++) {
+        var f = frac(t + k / 3), rx = lerp(5, 41, f), th = f < 0.1 ? lerp(0, 2.4, f / 0.1) : f < 0.9 ? lerp(2.4, 0.8, (f - 0.1) / 0.8) : lerp(0.8, 0, (f - 0.9) / 0.1);
+        if (th <= 0.02) continue;
+        p.path(oval(50, 61, rx, rx * 0.42) + oval(50, 61, Math.max(0.5, rx - th), Math.max(0.2, rx * 0.42 - th * 0.62)), { fill: 'white', alpha: 0.95 - 0.25 * f, line: false, holes: true });
+      }
+    });
+    p.curve([[10, 79.5], [30, 82], [50, 82.8], [70, 82], [90, 79.5]], { ink: 'ink', w: 0.5, detail: true });          /* the near edge of the lawn */
+    /* the chalk: two arms, each its own ragged polygon, with the sky plate printed a hair off beneath */
+    var arm = function (a0, b0, seed) {
+      var rg = M.rng(seed), n = 8, L = [], Rr = [], dx = b0[0] - a0[0], dy = b0[1] - a0[1], len = Math.hypot(dx, dy), nx = -dy / len, ny = dx / len;
+      for (var j = 0; j < n; j++) {
+        var u = j / (n - 1), w = 3.1 * (0.42 + 0.58 * sin(PI * (0.08 + 0.84 * u))), cx = a0[0] + dx * u, cy = a0[1] + dy * u;
+        L.push([cx + nx * (w + (rg() - 0.5)), cy + ny * (w * 0.62 + (rg() - 0.5))]); Rr.push([cx - nx * (w + (rg() - 0.5)), cy - ny * (w * 0.62 + (rg() - 0.5))]);
+      }
+      return L.concat(Rr.reverse());
+    };
+    var A = arm(gp(-0.62, 0.16), gp(0.62, 0.86), 11), B = arm(gp(0.62, 0.16), gp(-0.62, 0.86), 23);
+    [A, B].forEach(function (poly) {
+      p.poly(poly.map(function (q) { return [q[0] + 1.2, q[1] + 1.2]; }), { fill: 'blue', alpha: 0.5, line: false });
+      p.poly(poly, { fill: 'white', line: false });
+    });
+    var r2 = M.rng(5); for (i = 0; i < 8; i++) { var arm0 = i % 2 ? A : B, q0 = arm0[Math.floor(r2() * arm0.length)]; p.dot(q0[0] + (r2() - 0.5) * 9, q0[1] + (r2() - 0.5) * 6, 0.4 + r2() * 0.5, 'white'); }
+    /* the stake at the back left corner, standing in the grass inside the tile, and its tape: yellow, then black, with a swallow tail, stirring a little */
+    var sw = sin(TAU * t) * 0.8;
+    p.ellipse(23.4, 47.5, 3.6, 1.05, { fill: 'smoke', line: false, alpha: 0.5 });
+    p.poly([[21.2, 47], [22.8, 47], [22.9, 31], [21.1, 31]], { fill: 'wood', ink: 'ink', w: 0.35 });
+    blade(p, 19.4, 48.2, 4.4, -1.4, 0.65, 'green'); blade(p, 25.6, 48.2, 3.8, 1.5, 0.6, 'green');
+    p.poly([[22.9, 32.2], [31.5, 31.6 + sw * 0.5], [31.5, 34], [22.9, 34.6]], { fill: 'yellow', line: false });
+    p.poly([[31.9, 31.6 + sw * 0.5], [40, 30.9 + sw], [37.5, 32.3 + sw], [40, 33.7 + sw], [31.9, 34]], { fill: 'ink', line: false });
+    /* tap: a golf ball falls on the middle, hops 24 then 8 units, a puff of chalk dust, the stars from the contact point */
+    if (s.tap >= 0) {
+      var ta = s.tap, R = 8, gy = 61.5, h, sq, u2;
+      if (ta < 0.3) h = lerp(70, 0, Math.pow(seg(ta, 0, 0.3), 2));
+      else if (ta < 0.6) { u2 = seg(ta, 0.3, 0.6); h = 24 * 4 * u2 * (1 - u2); }
+      else if (ta < 0.8) { u2 = seg(ta, 0.6, 0.8); h = 8 * 4 * u2 * (1 - u2); }
+      else h = 0;
+      sq = 0.2 * land(ta - 0.3, 0.05) + 0.1 * land(ta - 0.6, 0.04);
+      p.ellipse(51, gy + 0.6, R * (0.9 - Math.min(0.4, h / 120)), 2.1, { fill: 'smoke', line: false, alpha: 0.5 });
+      p.at(50, gy - R * (1 - sq) - h, 0, [1 + sq, 1 - sq], function () { ball(p, R, 0.6 + ta * 9, { rows: 5, cols: 8, big: 1.5, w: 1, n7: -0.8, small: p.small }); });
+      var ag = (ta - 0.3) / 0.35;
+      if (ag > 0 && ag < 1) for (i = 0; i < 6; i++) { var an = PI * (0.08 + 0.84 * (i / 5)), dd = 5 + 17 * eo(ag) * (0.7 + 0.15 * ((i * 5) % 3)); p.dot(50 + cos(an) * dd * 1.5, gy + 1 - Math.abs(sin(an)) * dd * 0.2 - (i % 2) * 2.5 * eo(ag), 1.25 * (1 - 0.65 * ag), 'white'); }
+    }
+  }
+});
+
 })(Dingbats);
 
 /* Work: the jobs people hand over — a page, a stamp, a translation, a wrench, a laptop, a server, a parcel, a passport. First drawn for hongdam.net's service lines (2026-10-23). */

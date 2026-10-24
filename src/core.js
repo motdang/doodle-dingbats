@@ -10,7 +10,8 @@
        a b c skin   colours; the line is the text colour
        weight line weight, 1 by default · speed 1 by default · label words for a screen reader
    In code
-     Dingbats.draw(ctx, name, {x, y, size, t, look …})   one frame inside any canvas
+     Dingbats.draw(ctx, name, {x, y, size, t, look, rig …})   one frame inside any canvas
+     el.__db.puppet(t, rig) / el.__db.release()           the page moves it: frame t, pose rig (s.rig), until released
      Dingbats.svg(name, o) / Dingbats.svgLoop(name, o)   a frame, or the whole loop, as SVG
      Dingbats.burst(x, y, {names, n})                     a spray of small dingbats from a point
      Dingbats.favicon(name)                               the tab's icon, moving
@@ -417,7 +418,7 @@ function burst(pen, def, env) {
 /* ---------------------------------------------------------------- one frame */
 function record(name, env) {
   var def = REG[name] || REG['?'], W = 100 * (def.ratio || 1), pen = new Pen(W, env);
-  def.draw.call(def, pen, env.t, { tap: env.tap, taps: env.taps || 0, seed: env.seed || 0, calm: !!env.calm, px: env.px, look: env.look });
+  def.draw.call(def, pen, env.t, { tap: env.tap, taps: env.taps || 0, seed: env.seed || 0, calm: !!env.calm, px: env.px, look: env.look, rig: env.rig || null });
   burst(pen, def, env);
   return { def: def, W: W, marks: pen.marks };
 }
@@ -425,7 +426,7 @@ function envOf(name, o) {
   o = o || {};
   var def = REG[name] || REG['?'];
   return { name: name, t: o.t == null ? (def.still == null ? 0.25 : def.still) : frac(o.t), tap: o.tap == null ? -1 : o.tap, taps: o.taps || 0, boil: o.boil || 0, seed: o.seed || 0,
-    px: o.px || o.size || 96, look: o.look || 'ink', ink: o.ink, bg: o.bg, weight: o.weight, calm: o.calm, coarse: o.coarse,
+    px: o.px || o.size || 96, look: o.look || 'ink', ink: o.ink, bg: o.bg, weight: o.weight, calm: o.calm, coarse: o.coarse, rig: o.rig,
     cols: { a: o.a, b: o.b, c: o.c, skin: o.skin } };
 }
 D.ops = function (name, o) { var env = envOf(name, o), r = record(name, env); return { W: r.W, H: 100, ops: geometry(r.marks, env), env: env }; };
@@ -603,6 +604,10 @@ if (DOC) (function () {
     I.stop = function () { var k = LIVE.indexOf(I); if (k >= 0) LIVE.splice(k, 1); if (IO) IO.unobserve(el); if (RO) RO.unobserve(el); el.removeEventListener('click', I.onTap); el.removeEventListener('pointerenter', I.on); el.removeEventListener('pointerleave', I.off); el.removeEventListener('focusin', I.on); el.removeEventListener('focusout', I.off); el.__db = null; };
     I.onTap = function () { I.tap0 = now(); I.taps++; var dd = REG[I.name] || {}; if (!calm() && !I.burstM && (dd.burst !== false || dd.tapMargin != null)) { I.burstM = 1; size(I); } kick(); };
     I.on = function () { I.hot = true; kick(); }; I.off = function () { I.hot = false; };
+    /* a page that moves the thing itself holds its strings: puppet(t, rig) draws frame t with the pose rig now, and the
+       clock waits until release() */
+    I.puppet = function (t, rig) { I.held = 1; I.ht = t; I.env.rig = rig || null; draw(I, now(), true); };
+    I.release = function () { I.held = 0; I.env.rig = null; kick(); };
     el.addEventListener('click', I.onTap); el.addEventListener('pointerenter', I.on); el.addEventListener('pointerleave', I.off); el.addEventListener('focusin', I.on); el.addEventListener('focusout', I.off);
     el.__db = I; LIVE.push(I);
     colours(I); size(I);
@@ -611,7 +616,7 @@ if (DOC) (function () {
     return I;
   }
   function running(I) {
-    if (calm()) return false;
+    if (I.held || calm()) return false;
     if (I.play === 'still') return false;
     if (I.play === 'hover') return I.hot;
     if (I.play === 'once') return I.ran < 1;
@@ -623,7 +628,7 @@ if (DOC) (function () {
     if (run) { I.clock += dt; if (I.play === 'once') I.ran += dt / loop; }
     var tap = -1, tl = (def.tapLen || 1);
     if (I.tap0 >= 0) { tap = (tn - I.tap0) / 1000 / tl; if (tap >= 1) { tap = -1; I.tap0 = -1; if (I.burstM) { I.burstM = 0; size(I); } } }
-    var st = def.still == null ? 0.25 : def.still, c = calm(), t = c || (I.play === 'once' && I.ran >= 1) || (!run && I.clock === 0) ? st : frac(I.clock / loop + st);
+    var st = def.still == null ? 0.25 : def.still, c = calm(), t = I.held ? frac(I.ht) : c || (I.play === 'once' && I.ran >= 1) || (!run && I.clock === 0) ? st : frac(I.clock / loop + st);
     if (c && tap >= 0) tap = def.tapRest == null ? 0.5 : def.tapRest;
     var fi = Math.floor((tn / 1000) * 24), boil = (run || tap >= 0) && !c ? Math.floor(tn / 125) % 3 : 0;
     if (!force && fi === I.last) return;

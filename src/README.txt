@@ -19,7 +19,7 @@ D.add('name', {
   draw: function (p, t, s) { … }
 });
 
-draw(p, t, s) is called for every frame. t runs 0 → 1 over the loop and wraps; s.tap is −1 when idle and 0 → 1 during a tap reaction; s.taps counts taps (toggles: s.taps % 2); s.calm is true when the reader has turned motion off; s.px is the drawn height in CSS pixels, and p.small is true below 30 px (leave out what would be noise). Use nothing else: no Date, no Math.random, no state kept between calls. Randomness comes from p.rng(n) or M.rng(seed), seeded, so the same frame always draws the same marks.
+draw(p, t, s) is called for every frame. t runs 0 → 1 over the loop and wraps; s.tap is −1 when idle and 0 → 1 during a tap reaction; s.taps counts taps (toggles: s.taps % 2); s.calm is true when the reader has turned motion off; s.px is the drawn height in CSS pixels, and p.small is true below 30 px (leave out what would be noise). s.rig is null unless a page moves the thing itself (el.__db.puppet(t, rig)): then it holds that frame's pose, and a drawing that takes one also draws something sensible without it. Use nothing else: no Date, no Math.random, no state kept between calls. Randomness comes from p.rng(n) or M.rng(seed), seeded, so the same frame always draws the same marks.
 
 THE BOX: 100 high, 100 × ratio wide, y grows downward. The pen (p) records marks; the look (ink, paper, riso, neon, mono) turns them into pixels. Later marks cover earlier ones.
 
