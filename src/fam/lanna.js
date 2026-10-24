@@ -1087,13 +1087,19 @@ function swanWing(p, x, y, ang, k, far) {
 }
 /* one red eye, k its height (a blink) */
 function swanEye(p, x, y, k) { p.at(x, y, 0, [1, Math.max(0.1, k)], function () { p.dot(0, 0, 1.9, 'red'); p.dot(0.5, -0.5, 0.65, 'white'); }); }
-/* the head at its own origin, facing +x; turn 0 in profile, 1 looking straight at you */
-function swanHead(p, turn, blink, small) {
-  var side = 1 - turn, k = 1 - blink;
+/* the head at its own origin, facing +x; turn 0 in profile, 1 looking straight at you; open 0..1 the bill open (a honk) */
+function swanHead(p, turn, blink, small, open) {
+  var side = 1 - turn, k = 1 - blink, op = open || 0;
   p.ellipse(0, 0, 7.6 - 1.4 * turn, 5.6 + 0.8 * turn, { fill: 'black', rot: -0.12 * side });
   if (side > 0.02) p.pivot(4.6, 0, 0, [Math.max(0.02, side), 1], function () {
-    p.path('M4.6 -3.2 L19.4 1.4 C20 3.6 17.4 5 14.6 4.8 L4.6 3.6 Z', { fill: 'red' });
-    p.line(13.6, 0, 13, 4.6, { ink: 'white', w: 1, wob: 0.3 });
+    if (op > 0.02) {
+      p.pivot(4.6, 1.6, 0.5 * op, 1, function () { p.path('M4.6 1.2 L16.8 3 C16.6 4.8 13.8 5.4 11.6 5.1 L4.6 3.8 Z', { fill: 'red', w: 0.8 }); });
+      p.path('M5 0.4 L14 ' + (2.6 + 2.4 * op) + ' L5 ' + (2.8 + 1.4 * op) + ' Z', { fill: 'night', line: false });
+    }
+    p.pivot(4.6, 0.4, -0.16 * op, 1, function () {
+      p.path(op > 0.02 ? 'M4.6 -3.2 L19.4 1.4 C19.6 2.6 18 3.2 15.6 3 L4.6 1.4 Z' : 'M4.6 -3.2 L19.4 1.4 C20 3.6 17.4 5 14.6 4.8 L4.6 3.6 Z', { fill: 'red' });
+      p.line(13.6, 0, 13, op > 0.02 ? 2.8 : 4.6, { ink: 'white', w: 1, wob: 0.3 });
+    });
   });
   if (turn > 0.02) p.pivot(0, 2, 0, Math.max(0.02, turn), function () {
     p.path('M-3.6 1.4 C-3.6 -0.4 3.6 -0.4 3.6 1.4 L1.3 10.6 C0.7 11.8 -0.7 11.8 -1.3 10.6 Z', { fill: 'red' });
@@ -1111,11 +1117,14 @@ function swanLeg(p, hx, hy, ax, ay, fa, spread, far, big) {
 }
 var SW_BODY = 'M-31 -3 C-25 -16 0 -19 18 -12 C28 -8 34 -2 32 6 C28 14 8 18 -12 16 C-24 14 -33 6 -31 -3 Z';
 /* the whole bird. o: x y (body centre), tilt (+ nose down), neck 0 upright, 1 diving, look, blink, wings 0..1, flap,
-   head (extra head angle), legs(p, behind) draws the legs in the body frame, sway (feather wag), t (feather curl) */
+   head (extra head angle), legs(p, behind) draws the legs in the body frame, sway (feather wag), t (feather curl),
+   open (the bill, a honk); or N, a pose from NK below, for the neck and head instead of neck and look */
 function swan(p, o) {
-  var neck = o.neck || 0, look = o.look || 0, wings = o.wings || 0, flap = o.flap || 0;
-  var H = [M.lerp(38 + 2 * look, 41, neck) + (o.reach || 0), M.lerp(-46 + 2 * look - 4 * wings, 4, neck)];
-  var C1 = [M.lerp(37, 32, neck), M.lerp(-18, -8, neck)], C2 = [M.lerp(24, 39, neck), M.lerp(-36, -5, neck)];
+  var neck = o.neck || 0, look = o.look || 0, wings = o.wings || 0, flap = o.flap || 0, N = o.N;
+  var H = N ? N.H : [M.lerp(38 + 2 * look, 41, neck) + (o.reach || 0), M.lerp(-46 + 2 * look - 4 * wings, 4, neck)];
+  var C1 = N ? N.C1 : [M.lerp(37, 32, neck), M.lerp(-18, -8, neck)], C2 = N ? N.C2 : [M.lerp(24, 39, neck), M.lerp(-36, -5, neck)];
+  /* face 1 the head in profile facing forward, 0 at you, -1 in profile facing back over its shoulder */
+  var face = N ? N.face : 1 - look, ha = (N ? N.a : M.lerp(0, 1.15, neck) + 0.12 * look) + (o.head || 0);
   p.at(o.x, o.y, o.tilt || 0, o.k || 1, function () {
     swanWing(p, 6, -12, 0.55 + flap * 0.55, wings * 1.15, true);
     if (o.legs) o.legs(p, true);
@@ -1128,7 +1137,7 @@ function swan(p, o) {
     if (o.legs) o.legs(p, false);
     var sp = bez([24, -8], C1, C2, H, 16), n = sp.length;
     tube(p, sp, function (s) { return 11 - 4.6 * s; }, { fill: 'black' });
-    p.at(H[0], H[1], M.lerp(0, 1.15, neck) + (o.head || 0) + 0.12 * look, 1, function () { swanHead(p, look, o.blink || 0, p.small); });
+    p.at(H[0], H[1], ha, face < 0 ? [-1, 1] : 1, function () { swanHead(p, 1 - Math.abs(face), o.blink || 0, p.small, o.open); });
     swanWing(p, 2, -10, 0.75 + flap * 0.65, wings * 1.2, false);
   });
 }
@@ -1218,6 +1227,200 @@ D.add('hongsa-stand', {
     legs(true);
     swan(p, { x: x, y: y, tilt: -0.14 - 0.22 * wings, look: look, blink: blink, wings: wings, flap: flap, sway: 0.05 * M.wave(t, 7, 0.2), t: t });
     legs(false);
+  }
+});
+/* What the swan does on hongdam.net's job lines (her ask 2026-10-24: "more variety in what they do, and interact
+   with each other ... and with the icons"). Each move plays once from the standing pose of hongsa-stand back to
+   it, so a page can swap one in mid-walk: the picture of the stop sits above the swan's head, and the line's end
+   may hold a mate (the two necks make a heart) or Dam, trotting behind.
+   Poses of the neck and head for swan(o.N), in the body frame: H the head, C1 C2 the neck's curve up from the
+   chest, a the head's angle, face 1 forward, 0 at you, -1 back over its shoulder. */
+var NK = {
+  rest: { H: [38, -46], C1: [37, -18], C2: [24, -36], a: 0, face: 1 },
+  up: { H: [47, -70], C1: [38, -22], C2: [30, -52], a: -1.05, face: 1 },
+  peek: { H: [41, -54], C1: [38, -20], C2: [27, -42], a: -0.62, face: 1 },
+  honk: { H: [52, -50], C1: [42, -18], C2: [35, -38], a: -0.45, face: 1 },
+  bow: { H: [46, -4], C1: [40, -18], C2: [52, -32], a: 1.45, face: 1 },
+  ground: { H: [48, 6], C1: [36, -14], C2: [52, -20], a: 1.5, face: 1 },
+  preen: { H: [-4, -20], C1: [30, -30], C2: [14, -44], a: -0.75, face: -1 },
+  tuck: { H: [-6, -17], C1: [30, -26], C2: [14, -36], a: -0.2, face: -1 },
+  nuzzle: { H: [50, -34], C1: [40, -18], C2: [54, -46], a: 1.2, face: 1 },
+  heart: { H: [33, -60], C1: [0, -28], C2: [6, -84], a: 1.35, face: 1 }
+};
+function nk(A, B, u) {
+  var L = M.lerp, f = function (a, b) { return [L(a[0], b[0], u), L(a[1], b[1], u)]; };
+  return { H: f(A.H, B.H), C1: f(A.C1, B.C1), C2: f(A.C2, B.C2), a: L(A.a, B.a, u), face: L(A.face, B.face, u) };
+}
+/* a standing swan, body at (o.x, o.y), with its shadow and feet on the ground; ft: step / step2 lift the near / far
+   foot, air 0..1 tucks both up under it (a hop), nx / fx put the near / far foot somewhere else (a step forward) */
+function standing(p, o, ft) {
+  var G = 93, x = o.x, y = o.y, air = ft.air || 0;
+  p.ellipse(x + 2, G + 0.5, 20 * (1 - 0.4 * air), 2.6, { fill: 'smoke', line: false, alpha: 0.55 * (1 - 0.4 * air) });
+  var leg = function (far) {
+    var lift = 5 * (far ? ft.step2 || 0 : ft.step || 0), hx = x + (far ? -4 : 1), hy = y + 13;
+    var ax = far ? (ft.fx != null ? ft.fx : x - 7) : (ft.nx != null ? ft.nx : x + 4), ay = G - 1.5 - lift;
+    if (air > 0) { ax = M.lerp(ax, hx - 7, air); ay = M.lerp(ay, hy + 10, air); }
+    swanLeg(p, hx, hy, ax, ay, air > 0.2 ? 0.8 * air : lift > 0.5 ? 0.35 : 0, air > 0.2 || lift > 0.5 ? 0.4 : 1, far, 1.4);
+  };
+  leg(true); swan(p, o); leg(false);
+}
+/* a tap on any of these: it turns to look at you, honks and beats its wings */
+function swanTap(o, s) {
+  if (s.tap < 0) return;
+  var q = s.tap, seg = M.seg, ez = M.ease, k = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1)));
+  o.N = nk(o.N || NK.rest, { H: [40, -44], C1: NK.rest.C1, C2: NK.rest.C2, a: 0.1, face: 0 }, k);
+  o.open = Math.max(o.open || 0, M.bump(seg(q, 0.14, 0.32)));
+  o.wings = Math.max(o.wings || 0, ez(seg(q, 0.25, 0.38)) * (1 - ez(seg(q, 0.78, 0.92))));
+  o.flap = o.wings * Math.sin(TAU * 2.5 * seg(q, 0.3, 0.85));
+}
+/* a sung note or a heart rising from (x, y) over u 0..1, wavering unless straight (the mates' heart, drawn by both) */
+function rise(p, kind, x, y, u, i, colour, straight) {
+  if (u <= 0 || u >= 1 || p.small) return;
+  var k = 1.05 * M.easeOut(M.seg(u, 0, 0.15)) * (1 - M.easeIn(M.seg(u, 0.6, 1))), wv = straight ? 0 : 1;
+  p.at(x + 4 * wv * Math.sin(TAU * u * 1.5 + i), y - 30 * u, 0.3 * wv * Math.sin(TAU * u + i), k, function () { D.bits[kind](p, colour); });
+}
+var SWAN_MOVE = { fam: 'lanna', ratio: 1.2, still: 0, burst: 'note', burstAt: [96, 16], burstN: 3, burstSpread: 2.2, tapLen: 1.6, tapRest: 0.3, margin: [44, 26, 12, 20], tapAbout: 'it looks at you, honks and flaps' };
+function mv(def) { return Object.assign({}, SWAN_MOVE, def); }
+D.add('hongsa-peck', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'peck', 'reach', 'tap', 'bird', '🦢'], loop: 1.6,
+  about: 'the black swan stretches up on its toes and taps what is above it with its bill, twice, then settles and shakes its head',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump;
+    var up = ez(seg(t, 0.04, 0.26)) * (1 - ez(seg(t, 0.68, 0.84))), tap = bump(seg(t, 0.3, 0.42)) + bump(seg(t, 0.46, 0.58));
+    var shake = Math.sin(TAU * 3 * seg(t, 0.84, 0.98)) * bump(seg(t, 0.84, 0.98));
+    var N = nk(NK.rest, NK.up, up);
+    N.H = [N.H[0] + 3 * tap, N.H[1] - 5 * tap]; N.a -= 0.15 * tap;
+    var o = { x: 54, y: 66 - 3 * up, tilt: -0.14 - 0.12 * up, N: N, head: 0.3 * shake, blink: bump(seg(t, 0.62, 0.66)), sway: 0.04 * Math.sin(TAU * 2 * t), t: t };
+    swanTap(o, s);
+    standing(p, o, {});
+  }
+}));
+D.add('hongsa-hop', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'hop', 'jump', 'bird', '🦢'], loop: 1.1,
+  about: 'the black swan crouches, jumps straight up with its wings half open and its feet tucked, bumps what is above it with its head, and lands with a bounce',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump;
+    var crouch = bump(seg(t, 0, 0.22)) + 0.8 * bump(seg(t, 0.68, 0.88)), air = seg(t, 0.18, 0.7), h = air > 0 && air < 1 ? 4 * air * (1 - air) : 0;
+    var wings = ez(seg(t, 0.16, 0.26)) * (1 - ez(seg(t, 0.62, 0.74))), flap = wings * Math.sin(TAU * 2 * seg(t, 0.2, 0.7));
+    var o = { x: 54, y: 66 + 4 * crouch - 28 * h, tilt: -0.14 + 0.12 * crouch - 0.1 * h, N: nk(NK.rest, NK.peek, 0.6 * bump(seg(t, 0.12, 0.76))), wings: 0.8 * wings, flap: flap, sway: 0.08 * h, t: t };
+    swanTap(o, s);
+    standing(p, o, { air: Math.min(1, 3 * h) });
+  }
+}));
+D.add('hongsa-flap', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'flap', 'wings', 'bird', '🦢'], loop: 1.6,
+  about: 'the black swan rears up and beats its wings three times; a loose white feather drifts down; it shuffles its feet and settles',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump;
+    var rear = ez(seg(t, 0.06, 0.2)) * (1 - ez(seg(t, 0.78, 0.92))), flap = rear * Math.sin(TAU * 3 * seg(t, 0.18, 0.8));
+    var o = { x: 54, y: 66 - 4 * rear, tilt: -0.14 - 0.26 * rear, N: nk(NK.rest, NK.peek, 0.5 * rear), wings: rear, flap: flap, sway: 0.1 * rear * Math.sin(TAU * 6 * t), t: t };
+    swanTap(o, s);
+    standing(p, o, { step: bump(seg(t, 0.84, 0.92)), step2: bump(seg(t, 0.9, 0.98)) });
+    var fu = seg(t, 0.35, 1);
+    if (!p.small && fu > 0 && fu < 1) p.at(30 - 20 * fu + 5 * Math.sin(TAU * 2 * fu), 12 + 72 * fu, 0.7 * Math.sin(TAU * 1.5 * fu), 1, function () {
+      var a = 1 - M.easeIn(seg(fu, 0.7, 1));
+      p.ellipse(0, 0, 5, 1.8, { fill: 'white', w: 0.5, alpha: a }); p.line(-5, 0, 4, 0, { w: 0.35, ink: 'grey', alpha: a });
+    });
+  }
+}));
+D.add('hongsa-honk', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'honk', 'call', 'sing', 'bird', '🦢'], loop: 1.5,
+  about: 'the black swan stretches its neck forward, opens its red bill and honks twice; two notes float up',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump;
+    var st = ez(seg(t, 0.04, 0.2)) * (1 - ez(seg(t, 0.78, 0.94))), h1 = bump(seg(t, 0.24, 0.4)), h2 = bump(seg(t, 0.46, 0.62));
+    var N = nk(NK.rest, NK.honk, st);
+    N.H = [N.H[0] + 3 * (h1 + h2), N.H[1] - 2 * (h1 + h2)];
+    var o = { x: 54, y: 66 - 1.5 * st, tilt: -0.19 * st - 0.14 * (1 - st), N: N, open: Math.min(1, h1 + h2), sway: 0.04 * Math.sin(TAU * 2 * t), t: t };
+    swanTap(o, s);
+    standing(p, o, {});
+    rise(p, 'note', 124, 6, seg(t, 0.26, 0.7), 0);
+    rise(p, 'note', 130, 8, seg(t, 0.48, 0.92), 1);
+  }
+}));
+D.add('hongsa-bow', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'bow', 'wai', 'greet', 'thank', 'bird', '🦢'], loop: 1.9,
+  about: 'the black swan bows low with its eyes closed, a wai, holds it, and rises',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, b = ez(seg(t, 0.06, 0.3)) * (1 - ez(seg(t, 0.68, 0.9)));
+    var shut = ez(seg(t, 0.26, 0.32)) * (1 - ez(seg(t, 0.6, 0.66)));
+    var o = { x: 54, y: 66 + 2 * b, tilt: -0.14 + 0.18 * b, N: nk(NK.rest, NK.bow, b), blink: shut, sway: 0.03 * Math.sin(TAU * t), t: t };
+    swanTap(o, s);
+    standing(p, o, {});
+  }
+}));
+D.add('hongsa-look', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'look', 'curious', 'wonder', 'bird', '🦢'], loop: 1.8,
+  about: 'the black swan looks up at what is above it, tips its head one way and the other, blinks twice, and a question mark comes and goes',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump;
+    var lk = ez(seg(t, 0.04, 0.2)) * (1 - ez(seg(t, 0.78, 0.94))), tip = Math.sin(TAU * seg(t, 0.24, 0.72)) * bump(seg(t, 0.24, 0.72));
+    var N = nk(NK.rest, NK.peek, lk);
+    N.a += 0.35 * tip; N.H = [N.H[0] - 2 * tip, N.H[1]];
+    var o = { x: 54, y: 66, tilt: -0.14, N: N, blink: Math.min(1, bump(seg(t, 0.4, 0.45)) + bump(seg(t, 0.5, 0.55))), sway: 0.03 * Math.sin(TAU * t), t: t };
+    swanTap(o, s);
+    standing(p, o, {});
+    var qa = bump(seg(t, 0.28, 0.76));
+    if (!p.small && qa > 0.02) p.at(76, 2 - 4 * qa, 0.15 * tip, 0.9 * qa, function () { p.path('M-3.5 -4 C-3.5 -9 4.5 -9 4.5 -4 C4.5 -0.5 0.5 -0.5 0.5 3', { w: 1.1, cap: 'round' }); p.dot(0.5, 7, 1, 'ink'); });
+  }
+}));
+/* The heart: a mate waits at the end of the line, drawn as this same swan mirrored in the box next to it. Both
+   step forward until their chests touch at the shared edge, arch their necks and bow their heads until the bills
+   meet: two necks, one heart. A heart rises from where the heads touch. */
+D.add('hongsa-court', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'heart', 'love', 'pair', 'mate', 'bird', '🦢'], loop: 5,
+  about: 'the black swan steps forward to its mate (the same swan mirrored beside it), arches its neck and bows its head until the bills touch, so the two necks make a heart; a heart rises; they hold it, then straighten',
+  margin: [56, 30, 12, 20],
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, x0 = 54, x1 = 84;
+    var go = seg(t, 0.02, 0.2), x = M.lerp(x0, x1, ez(go)), back = ez(seg(t, 0.9, 0.99)), bx = M.lerp(x, x0, back);
+    var arch = ez(seg(t, 0.2, 0.34)) * (1 - ez(seg(t, 0.8, 0.9))), sway = Math.sin(TAU * 2 * seg(t, 0.34, 0.8)) * arch;
+    var N = nk(NK.rest, NK.heart, arch);
+    N.H = [N.H[0], N.H[1] + 1.2 * sway];
+    var o = { x: bx, y: 66 + 1.5 * arch, tilt: -0.14 + 0.08 * arch, N: N, blink: Math.min(1, ez(seg(t, 0.36, 0.4)) * (1 - ez(seg(t, 0.72, 0.76)))), sway: 0.05 * sway, t: t };
+    swanTap(o, s);
+    var nf = M.lerp(x0 + 4, x1 + 4, ez(seg(go, 0, 0.5))), ff = M.lerp(x0 - 7, x1 - 7, ez(seg(go, 0.5, 1)));
+    standing(p, o, { nx: M.lerp(nf, bx + 4, back), fx: M.lerp(ff, bx - 7, back), step: bump(seg(go, 0, 0.5)) + bump(seg(t, 0.9, 0.945)), step2: bump(seg(go, 0.5, 1)) + bump(seg(t, 0.945, 0.99)) });
+    rise(p, 'heart', 120, -2, seg(t, 0.34, 0.74), 0, 'red', true);
+  }
+}));
+/* Dam has run ahead of it; the swan bends its neck down to the little one in front and nuzzles it twice */
+D.add('hongsa-nuzzle', mv({
+  tags: ['swan', 'black swan', 'hongdam', 'nuzzle', 'chick', 'dam', 'parent', 'bird', '🦢'], loop: 2.4,
+  about: 'the black swan bends its neck down to whatever stands in front of it (Dam, on the job lines), nuzzles it twice with its eyes half shut, and a heart rises',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, b = ez(seg(t, 0.06, 0.28)) * (1 - ez(seg(t, 0.74, 0.92)));
+    var nuz = bump(seg(t, 0.32, 0.44)) + bump(seg(t, 0.48, 0.6));
+    var N = nk(NK.rest, NK.nuzzle, b);
+    N.H = [N.H[0] + 1.5 * nuz, N.H[1] + 3 * nuz]; N.a += 0.12 * nuz;
+    var o = { x: 54, y: 66 + 1.5 * b, tilt: -0.14 + 0.1 * b, N: N, blink: 0.6 * ez(seg(t, 0.3, 0.34)) * (1 - ez(seg(t, 0.62, 0.66))), sway: 0.06 * b * Math.sin(TAU * 3 * t), t: t };
+    swanTap(o, s);
+    standing(p, o, {});
+    rise(p, 'heart', 112, 8, seg(t, 0.38, 0.84), 0, 'red');
+  }
+}));
+/* Standing about after the job: it looks at you, preens, grazes, stretches and flaps, honks, dozes and shakes
+   itself awake. A page starts each one at its own place in the loop, so no two swans on it keep time. */
+D.add('hongsa-idle', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hongdam', 'idle', 'preen', 'graze', 'doze', 'bird', '🦢'], loop: 22, still: 0.02, ratio: 1.2, burst: 'note', burstAt: [96, 16], burstN: 3, burstSpread: 2.2, tapLen: 1.6, tapRest: 0.3, margin: [44, 26, 12, 20],
+  about: 'the black swan stands about: it looks at you and blinks, preens under its feathers, grazes twice, stretches up and flaps, honks, tucks its head back and dozes, then shakes itself awake and shuffles its feet',
+  tapAbout: 'it looks at you, honks and flaps',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, w = function (a, b, e) { e = e || 0.012; return ez(seg(t, a, a + e)) * (1 - ez(seg(t, b - e, b))); };
+    var look = w(0.06, 0.15, 0.01), preen = w(0.19, 0.33), graze = w(0.37, 0.47), stretch = w(0.51, 0.59, 0.01), honk = w(0.63, 0.69, 0.008), doze = w(0.73, 0.88, 0.02), shake = bump(seg(t, 0.885, 0.915));
+    var N = NK.rest;
+    N = nk(N, { H: [40, -44], C1: NK.rest.C1, C2: NK.rest.C2, a: 0.1, face: 0 }, look);
+    N = nk(N, NK.preen, preen); N = nk(N, NK.ground, graze); N = nk(N, NK.peek, 0.6 * stretch); N = nk(N, NK.honk, honk); N = nk(N, NK.tuck, doze);
+    var nib = preen * Math.sin(TAU * 9 * seg(t, 0.21, 0.31)), peck = graze * (bump(seg(t, 0.39, 0.42)) + bump(seg(t, 0.43, 0.46)));
+    N.H = [N.H[0] + 1.5 * nib, N.H[1] + 1.5 * nib + 4 * peck];
+    var open = honk * (bump(seg(t, 0.645, 0.66)) + bump(seg(t, 0.665, 0.68)));
+    var blink = Math.min(1, bump(seg(t, 0.03, 0.036)) + bump(seg(t, 0.1, 0.106)) + bump(seg(t, 0.13, 0.136)) + bump(seg(t, 0.95, 0.956)) + doze);
+    var flap = stretch * Math.sin(TAU * 2 * seg(t, 0.52, 0.58)), wings = stretch;
+    var o = { x: 54, y: 66 + 0.8 * M.wave(t, 22) - 3 * stretch + 2.5 * doze, tilt: -0.14 - 0.2 * stretch + 0.2 * graze + 0.05 * doze, N: N, head: 0.3 * Math.sin(TAU * 4 * seg(t, 0.885, 0.915)) * shake, open: open, blink: blink, wings: wings, flap: flap, sway: 0.05 * M.wave(t, 22, 0.2) + 0.1 * preen * Math.sin(TAU * 7 * t) + 0.12 * shake, t: t * 3 };
+    swanTap(o, s);
+    standing(p, o, { step: bump(seg(t, 0.92, 0.95)), step2: bump(seg(t, 0.95, 0.98)) });
+    if (!p.small && doze > 0.5) [0, 1, 2].forEach(function (i) { var u = M.frac((t - 0.75) * 9 + i / 3); p.at(36 + 6 * u + 4 * i, 18 - 26 * u, 0, 0.5 + 0.4 * u, function () { p.path('M-3 -3 L3 -3 L-3 3 L3 3', { w: 0.9, alpha: (doze - 0.5) * 2 * M.bump(u) }); }); });
+    rise(p, 'note', 126, 6, seg(t, 0.645, 0.7), 0);
   }
 });
 /* Dam (ดำ), the hongsa's chick in hongdam.net's egg story (data/eggs-story.json), at three ages: 0 a ball of grey
@@ -1354,6 +1557,35 @@ D.add('duckling-fledgling', {
   }
 });
 
+/* Dam on hongdam.net's job lines: trotting after the swan, and waiting for it */
+function damBall(p, t, s, o) {
+  var G = 93, go = o.go, look = o.look || 0, beak = o.beak || 0, flap = o.flap || 0, hop = o.hop || 0;
+  if (s.tap >= 0) {
+    var q = s.tap, ez = M.ease, seg = M.seg, tw = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1)));
+    go *= 1 - tw; look = Math.max(look, tw); beak = M.bump(seg(q, 0.16, 0.34)) + M.bump(seg(q, 0.4, 0.58));
+    flap = Math.abs(Math.sin(TAU * 3 * seg(q, 0.2, 0.8))) * M.bump(seg(q, 0.16, 0.84)); hop = 5 * M.bump(seg(q, 0.18, 0.42));
+  }
+  var ph = TAU * o.ph, roll = 0.14 * Math.sin(ph) * go, x = 46, y = 64 - 2.4 * Math.abs(Math.sin(ph)) * go - hop + (o.sit || 0) * 10;
+  p.ellipse(x + 2, G + 0.5, 17, 2.4, { fill: 'smoke', line: false, alpha: 0.55 });
+  var legs = damLegs(p, { t: o.ph, x: x, y: y, roll: roll, go: go, hip: [1, 12], G: G, stride: 7, lift: 5, big: 1.25, fwd: 5 * (o.sit || 0) });
+  cygnet(p, { x: x, y: y, tilt: roll, age: 0, look: look, blink: o.blink || 0, beak: beak, flap: flap, head: o.head || 0, t: t, legs: function (pp, far) { pp.at(-x, -y, 0, 1, function () { legs(pp, far); }); } });
+}
+D.add('duckling-walk', {
+  fam: 'lanna', tags: ['cygnet', 'duckling', 'chick', 'swan', 'hongdam', 'dam', 'walk', 'hurry', 'bird', '🐣'], loop: 0.5, still: 0.25, ratio: 1, burst: 'note', burstAt: [70, 30], burstN: 3, burstSpread: 1.6, burstDelay: 0.2, tapLen: 1.4, tapRest: 0.35, margin: [22, 16, 10, 16],
+  about: 'Dam hurries after its parent: a ball of grey down waddling fast on webbed feet too big for it',
+  tapAbout: 'it stops, looks up at you, peeps and flaps',
+  draw: function (p, t, s) { damBall(p, t, s, { go: 1, ph: t, head: -0.08 }); }
+});
+D.add('duckling-wait', {
+  fam: 'lanna', tags: ['cygnet', 'duckling', 'chick', 'swan', 'hongdam', 'dam', 'wait', 'bird', '🐣'], loop: 6, still: 0.05, ratio: 1, burst: 'note', burstAt: [70, 30], burstN: 3, burstSpread: 1.6, burstDelay: 0.2, tapLen: 1.4, tapRest: 0.35, margin: [22, 16, 10, 16],
+  about: 'Dam waits by its parent: it bobs, looks up at you and blinks, peeps, sits down hard and gets back up',
+  tapAbout: 'it looks up at you, peeps and flaps its two stubs of wings',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump;
+    var look = ez(seg(t, 0.2, 0.25)) * (1 - ez(seg(t, 0.42, 0.47))), beak = bump(seg(t, 0.3, 0.34)), sit = ez(seg(t, 0.6, 0.64)) * (1 - ez(seg(t, 0.84, 0.9)));
+    damBall(p, t, s, { go: 0, ph: 0, look: look, beak: beak, sit: sit, blink: Math.min(1, bump(seg(t, 0.1, 0.13)) + bump(seg(t, 0.36, 0.39))), hop: 1.5 * Math.abs(Math.sin(TAU * 3 * t)) * (1 - sit) * (1 - look), head: sit * (0.15 + 0.14 * Math.sin(TAU * 5 * t)) });
+  }
+});
 /* a dyed easter egg in the colour a (hongdam.net tints it with the colour of the day), a white zigzag band and
    white dots painted on. It rocks, and now and then something knocks from inside. Tap: it cracks along the
    zigzag, the top lifts, and Dam's head pops out, looks at you and peeps, then ducks back and the egg closes. */
