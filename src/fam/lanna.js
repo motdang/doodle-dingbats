@@ -1065,4 +1065,328 @@ D.add('cha-yen', {
     p.line(33, 28, 36.5, 76, { w: 0.5, ink: 'white', alpha: 0.9, detail: true });
   }
 });
+/* the hongsa (หงส์), Hongdam's black swan: curled Lanna flame feathers with gold ribs, a red bill with its white band,
+   red eyes, black webbed feet. One body in its own frame (facing right, centre 0 0), posed by hongsa (on water),
+   hongsa-walk (waddling) and hongsa-stand (on land). */
+function feather(p, x, y, ang, len, ph, small) {
+  p.at(x, y, ang, 1, function () {
+    var sp = bez([0, 0], [-len * 0.18, -len * 0.42], [-len * 0.5, -len * 0.78], [-len * 0.95, -len * 0.82], 14), n = sp.length;
+    var h = Math.atan2(sp[n - 1][1] - sp[n - 2][1], sp[n - 1][0] - sp[n - 2][0]), st = Math.hypot(sp[n - 1][0] - sp[n - 2][0], sp[n - 1][1] - sp[n - 2][1]), q = sp[n - 1].slice(), k, curl = 0.42 + 0.05 * Math.sin(TAU * ph);
+    for (k = 0; k < 18; k++) { h -= curl; st *= 0.9; q = [q[0] + Math.cos(h) * st, q[1] + Math.sin(h) * st]; sp.push(q); }
+    tube(p, sp, function (s) { return 8 * Math.pow(1 - s, 0.85) + 0.9; }, { fill: 'black' });
+    if (!small) p.curve(sp.slice(3, sp.length - 3), { ink: 'a', w: 0.5, wob: 0.4 });
+  });
+}
+/* a raised wing from the shoulder, white flight feathers at its tip; k 0..1 how far it has opened */
+function swanWing(p, x, y, ang, k, far) {
+  if (k < 0.02) return;
+  p.at(x, y, ang, k, function () {
+    p.path('M0 0 C-4 -20 -22 -36 -46 -38 C-40 -31 -38 -25 -40 -18 C-33 -16 -29 -9 -31 -2 C-20 -3 -9 -1 0 0 Z', { fill: far ? 'night' : 'black' });
+    [[-41, -31, 0.5], [-37, -22, 0.35], [-34, -13, 0.2], [-27, -6, 0.1]].forEach(function (f) { p.ellipse(f[0], f[1], 5.2, 2.2, { fill: 'white', w: 0.5, rot: f[2] }); });
+  });
+}
+/* one red eye, k its height (a blink) */
+function swanEye(p, x, y, k) { p.at(x, y, 0, [1, Math.max(0.1, k)], function () { p.dot(0, 0, 1.9, 'red'); p.dot(0.5, -0.5, 0.65, 'white'); }); }
+/* the head at its own origin, facing +x; turn 0 in profile, 1 looking straight at you */
+function swanHead(p, turn, blink, small) {
+  var side = 1 - turn, k = 1 - blink;
+  p.ellipse(0, 0, 7.6 - 1.4 * turn, 5.6 + 0.8 * turn, { fill: 'black', rot: -0.12 * side });
+  if (side > 0.02) p.pivot(4.6, 0, 0, [Math.max(0.02, side), 1], function () {
+    p.path('M4.6 -3.2 L19.4 1.4 C20 3.6 17.4 5 14.6 4.8 L4.6 3.6 Z', { fill: 'red' });
+    p.line(13.6, 0, 13, 4.6, { ink: 'white', w: 1, wob: 0.3 });
+  });
+  if (turn > 0.02) p.pivot(0, 2, 0, Math.max(0.02, turn), function () {
+    p.path('M-3.6 1.4 C-3.6 -0.4 3.6 -0.4 3.6 1.4 L1.3 10.6 C0.7 11.8 -0.7 11.8 -1.3 10.6 Z', { fill: 'red' });
+    p.line(-2.4, 6.4, 2.4, 6.4, { ink: 'white', w: 0.9, wob: 0.3 });
+    if (!small) { p.dot(-1.1, 2.8, 0.45, 'black'); p.dot(1.1, 2.8, 0.45, 'black'); }
+  });
+  swanEye(p, M.lerp(1.9, -3.1, turn), -1.7, k);
+  if (turn > 0.35) swanEye(p, 3.1, -1.7, k);
+}
+/* a black leg from the hip (hx, hy) to the ankle (ax, ay), and its webbed foot at angle fa; spread 0 folded, 1 open */
+function swanLeg(p, hx, hy, ax, ay, fa, spread, far, big) {
+  var c = far ? 'night' : 'black', s = 0.22 + 0.78 * spread, k = big || 1;
+  p.line(hx, hy, ax, ay, { w: 1.7 * k, ink: c, cap: 'round' });
+  p.at(ax, ay, fa, k, function () { p.path('M-1.6 0 L10.5 ' + (-4.8 * s) + ' Q13.4 0 10.5 ' + (4.8 * s) + ' Z', { fill: c, w: 0.6 }); if (spread > 0.6 && !p.small) { p.line(1, 0, 10, -2.6 * s, { ink: 'grey', w: 0.35 }); p.line(1, 0, 10, 2.6 * s, { ink: 'grey', w: 0.35 }); } });
+}
+var SW_BODY = 'M-31 -3 C-25 -16 0 -19 18 -12 C28 -8 34 -2 32 6 C28 14 8 18 -12 16 C-24 14 -33 6 -31 -3 Z';
+/* the whole bird. o: x y (body centre), tilt (+ nose down), neck 0 upright, 1 diving, look, blink, wings 0..1, flap,
+   head (extra head angle), legs(p, behind) draws the legs in the body frame, sway (feather wag), t (feather curl) */
+function swan(p, o) {
+  var neck = o.neck || 0, look = o.look || 0, wings = o.wings || 0, flap = o.flap || 0;
+  var H = [M.lerp(38 + 2 * look, 41, neck) + (o.reach || 0), M.lerp(-46 + 2 * look - 4 * wings, 4, neck)];
+  var C1 = [M.lerp(37, 32, neck), M.lerp(-18, -8, neck)], C2 = [M.lerp(24, 39, neck), M.lerp(-36, -5, neck)];
+  p.at(o.x, o.y, o.tilt || 0, o.k || 1, function () {
+    swanWing(p, 6, -12, 0.55 + flap * 0.55, wings * 1.15, true);
+    if (o.legs) o.legs(p, true);
+    var sw = o.sway || 0;
+    feather(p, -18, -6, 0.02 + sw, 21, o.t || 0, p.small);
+    feather(p, -9, -10, 0.26 + sw * 0.8, 26, (o.t || 0) + 0.3, p.small);
+    feather(p, 0, -11, 0.5 + sw * 0.6, 18, (o.t || 0) + 0.6, p.small);
+    p.path(SW_BODY, { fill: 'black' });
+    if (!p.small && wings < 0.3) p.path('M-17 -1 C-13 -4 -9 -3 -6 -1 C-3 -4 1 -3 4 0 C7 -3 11 -2 14 1', { ink: 'grey', w: 0.5, detail: true });
+    if (o.legs) o.legs(p, false);
+    var sp = bez([24, -8], C1, C2, H, 16), n = sp.length;
+    tube(p, sp, function (s) { return 11 - 4.6 * s; }, { fill: 'black' });
+    p.at(H[0], H[1], M.lerp(0, 1.15, neck) + (o.head || 0) + 0.12 * look, 1, function () { swanHead(p, look, o.blink || 0, p.small); });
+    swanWing(p, 2, -10, 0.75 + flap * 0.65, wings * 1.2, false);
+  });
+}
+D.add('hongsa', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hamsa', 'hongdam', 'bird', 'water', 'paddle', 'dive', 'lanna', '🦢'], loop: 10, still: 0.12, ratio: 1.2, burst: 'note', burstAt: [96, 16], burstN: 4, burstSpread: 2.4, burstDelay: 0.12, tapLen: 2, tapRest: 0.25, margin: [34, 20, 14, 20],
+  about: 'the black swan paddles with its feet under the water, turns to look at you and blinks, up-ends with its head underwater and its feet kicking, comes up, rears and flaps the water off its wings, shakes its head',
+  tapAbout: 'it turns to look at you, honks, rears up and beats its wings',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, W = 72, i;
+    var look = ez(seg(t, 0.28, 0.32)) * (1 - ez(seg(t, 0.44, 0.48)));
+    var blink = bump(seg(t, 0.385, 0.41)) + bump(seg(t, 0.06, 0.08)) + bump(seg(t, 0.2, 0.22));
+    var dive = ez(seg(t, 0.52, 0.575)) * (1 - ez(seg(t, 0.7, 0.76)));
+    var rear = ez(seg(t, 0.765, 0.795)) * (1 - ez(seg(t, 0.88, 0.92)));
+    var flap = rear * Math.sin(TAU * 3 * seg(t, 0.785, 0.885));
+    var shake = Math.sin(TAU * 4 * seg(t, 0.925, 0.975)) * bump(seg(t, 0.925, 0.975));
+    if (s.tap >= 0) {
+      var q = s.tap, tw = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.85, 1)));
+      look = Math.max(look * (1 - tw), ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.3, 0.42))));
+      dive *= 1 - tw;
+      rear = Math.max(rear * (1 - tw), ez(seg(q, 0.3, 0.42)) * (1 - ez(seg(q, 0.86, 1))));
+      flap = rear * Math.sin(TAU * 3 * seg(q, 0.38, 0.88));
+    }
+    var pad = TAU * 20 * t, kick = dive > 0.5 ? TAU * 36 * t : pad;
+    var x = 54, y = 68 + 1.1 * M.wave(t, 5) - 10 * dive - 13 * rear;
+    if (!p.small) for (i = 0; i < 2; i++) { var u = M.frac(t * 5 + i / 2); p.ellipse(x + 30, W + 1, 6 + 16 * u, 1.4 + 2.2 * u, { ink: 'sky', w: 0.6, alpha: 0.85 * (1 - u) * (1 - dive), fill: false }); }
+    swan(p, {
+      x: x, y: y, tilt: 0.85 * dive - 0.38 * rear, neck: dive, look: look, blink: Math.min(1, blink), wings: rear, flap: flap, head: 0.25 * shake, sway: 0.04 * M.wave(t, 5, 0.1), t: t,
+      legs: function (p, far) {
+        var ph = far ? kick + Math.PI : kick, a = 0.5 + 0.42 * Math.sin(ph), power = Math.cos(ph) > 0 ? 1 : 0.15, hx = far ? 2 : 6, hy = 12;
+        if (rear > 0.3) { a = 0.15 + 0.3 * Math.sin(ph * 1.5); power = 1; }
+        var ax = hx - 15 * Math.sin(a), ay = hy + 15 * Math.cos(a);
+        swanLeg(p, hx, hy, ax, ay, -0.25 + 0.6 * Math.sin(ph) * (1 - rear), power, far);
+      }
+    });
+    /* the water: what is under it is seen through it */
+    var top = sinew(2, 118, W, 1.3, 24, t * 3);
+    p.path('M' + top.map(function (q) { return q[0].toFixed(1) + ' ' + q[1].toFixed(1); }).join(' L') + ' L118 92 Q60 101 2 92 Z', { fill: 'sky', line: false, alpha: 0.42 });
+    p.curve(top, { ink: 'sky', w: 0.9 });
+    if (p.small) return;
+    var spl = function (u, x0, n, h) { if (u <= 0 || u >= 1) return; for (var j = 0; j < n; j++) { var r = M.rng(97 + j * 13 + n)(), vx = (j - (n - 1) / 2) * 5.5 * (0.6 + r), vy = h * (0.6 + 0.6 * r); p.dot(x0 + vx * u, W - vy * u + 2.4 * vy * u * u, 1.5 * (1 - 0.5 * u), 'sky'); } };
+    spl(seg(t, 0.545, 0.62), x + 26, 7, 26);
+    spl(seg(t, 0.715, 0.79), x + 20, 6, 22);
+    for (i = 0; i < 4; i++) { var bu = seg(t, 0.585 + i * 0.03, 0.66 + i * 0.03); if (bu > 0 && bu < 1) p.circle(x + 22 + 3 * Math.sin(TAU * bu * 2 + i), 90 - 18 * bu, 1 + 0.6 * i % 2, { ink: 'sky', w: 0.5, fill: false }); }
+    var wu = seg(t, 0.8, 0.9);
+    if (wu > 0 && wu < 1) for (i = 0; i < 6; i++) p.dot(x - 30 - 9 * i * wu, y - 40 + 10 * i * wu + 60 * wu * wu, 1.3 * (1 - wu), 'sky');
+  }
+});
+D.add('hongsa-walk', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hongdam', 'walk', 'waddle', 'feet', 'bird', '🦢'], loop: 0.9, still: 0.25, ratio: 1.2, burst: 'note', burstAt: [96, 16], burstN: 3, burstSpread: 2.2, tapLen: 1.6, tapRest: 0.3, margin: [34, 20, 12, 20],
+  about: 'the black swan waddles on black webbed feet: a foot lifts, folds, swings forward and plants flat; the body rolls side to side and the flame feathers wag behind',
+  tapAbout: 'it stops, looks at you, honks and flaps',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, ph = TAU * t, G = 93, tw = 0, look = 0, wings = 0, flap = 0;
+    if (s.tap >= 0) { var q = s.tap; tw = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1))); look = tw; wings = ez(seg(q, 0.25, 0.38)) * (1 - ez(seg(q, 0.78, 0.92))); flap = wings * Math.sin(TAU * 2.5 * seg(q, 0.3, 0.85)); }
+    var go = 1 - tw, roll = 0.11 * Math.sin(ph) * go, x = 54, y = 66 - 2.2 * Math.abs(Math.sin(ph)) * go;
+    p.ellipse(x + 2, G + 0.5, 22, 2.6, { fill: 'smoke', line: false, alpha: 0.55 });
+    var foot = function (far) {
+      var u = M.frac(t + (far ? 0.5 : 0)), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5;
+      var fx = st ? M.lerp(10, -10, v) : M.lerp(-10, 10, ez(v)), lift = st ? 0 : 6 * M.bump(v);
+      fx *= go; lift *= go;
+      var hx = (far ? -4 : 0), hy = 13, c = Math.cos(roll - 0.14), sn = Math.sin(roll - 0.14);
+      return { hx: x + hx * c - hy * sn, hy: y + hx * sn + hy * c, ax: x - 1 + fx, ay: G - 1.5 - lift, fa: st || !go ? 0 : 0.55 * M.bump(v), spread: st ? 1 : 0.3 + 0.7 * (1 - go) };
+    };
+    var legs = function (far) { var f = foot(far); swanLeg(p, f.hx, f.hy, f.ax, f.ay, f.fa, f.spread, far, 1.4); };
+    legs(true);
+    swan(p, { x: x, y: y, tilt: roll - 0.14, look: look, wings: wings, flap: flap, sway: 0.13 * Math.sin(ph + 0.5) * go, reach: 1.5 * Math.sin(2 * ph) * go, t: t });
+    legs(false);
+  }
+});
+D.add('hongsa-stand', {
+  fam: 'lanna', tags: ['swan', 'black swan', 'hongdam', 'stand', 'look', 'flap', 'bird', '🦢'], loop: 7, still: 0.36, ratio: 1.2, burst: 'note', burstAt: [96, 16], burstN: 3, burstSpread: 2.2, tapLen: 1.6, tapRest: 0.3, margin: [34, 20, 12, 20],
+  about: 'the black swan stands on its webbed feet: its flame feathers stir, it turns to look at you and blinks, stretches up and flaps, then shuffles its feet and settles',
+  tapAbout: 'it looks at you, honks and flaps',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, G = 93;
+    var look = ez(seg(t, 0.24, 0.29)) * (1 - ez(seg(t, 0.5, 0.55)));
+    var blink = Math.min(1, bump(seg(t, 0.36, 0.385)) + bump(seg(t, 0.42, 0.445)) + bump(seg(t, 0.1, 0.125)));
+    var wings = ez(seg(t, 0.58, 0.62)) * (1 - ez(seg(t, 0.76, 0.8))), flap = wings * Math.sin(TAU * 2 * seg(t, 0.6, 0.78));
+    var step = bump(seg(t, 0.84, 0.9)), step2 = bump(seg(t, 0.9, 0.96));
+    if (s.tap >= 0) { var q = s.tap; look = Math.max(look, ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1)))); var tw = ez(seg(q, 0.25, 0.38)) * (1 - ez(seg(q, 0.78, 0.92))); wings = Math.max(wings, tw); flap = wings * Math.sin(TAU * 2.5 * seg(q, 0.3, 0.85)); }
+    var x = 54, y = 66 + 0.8 * M.wave(t, 7) - 3 * wings;
+    p.ellipse(x + 2, G + 0.5, 20, 2.6, { fill: 'smoke', line: false, alpha: 0.55 });
+    var legs = function (far) {
+      var hx = x + (far ? -4 : 1), hy = y + 13, ax = x + (far ? -7 : 4) + 3 * step * (far ? 0 : 1) - 3 * step2 * (far ? 1 : 0), lift = 5 * (far ? step2 : step);
+      swanLeg(p, hx, hy, ax, G - 1.5 - lift, lift > 0.5 ? 0.35 : 0, lift > 0.5 ? 0.4 : 1, far, 1.4);
+    };
+    legs(true);
+    swan(p, { x: x, y: y, tilt: -0.14 - 0.22 * wings, look: look, blink: blink, wings: wings, flap: flap, sway: 0.05 * M.wave(t, 7, 0.2), t: t });
+    legs(false);
+  }
+});
+/* Dam (ดำ), the hongsa's chick in hongdam.net's egg story (data/eggs-story.json), at three ages: 0 a ball of grey
+   down; 1 scruffy, longer in the neck, black feathers poking through the grey; 2 nearly grown, black, grey down
+   left on the head, wings too long for it. Its webbed feet are too big at every age. Facing right, body centre at
+   0 0, like swan(). o: x y k tilt, age, look 0..1 (at you), blink, neck 0 up .. 1 down to the ground, beak 0..1
+   open, flap 0..1, head (extra head angle), legs(p, behind), t (the down stirs). */
+/* Dam's down: pale grey in the ink look, bare paper in riso, so the chick reads light against the inked swan */
+var DOWN = '#ECEAE6';
+function damHead(p, age, look, blink, beak, small) {
+  var side = 1 - look, k = 1 - (blink || 0), r = [8.2, 7, 6.6][age];
+  p.blob(0, 0, r, { fill: DOWN, lumpy: age === 2 ? 0.08 : 0.16, seed: 11 + age });
+  if (!small) [[-2, -r + 1, -0.5], [0, -r, 0], [2, -r + 1, 0.5]].slice(0, age === 2 ? 1 : 3).forEach(function (w) {
+    p.at(w[0], w[1], w[2], 1, function () { p.curve([[0, 0], [-0.8, -2.4], [0.6, -4]], { ink: 'grey', w: 0.6 }); });
+  });
+  var bill = age === 2 ? 'rose' : 'grey', L = [6.5, 8.5, 10][age];
+  if (side > 0.02) p.pivot(r * 0.7, 0, 0, [Math.max(0.02, side), 1], function () {
+    p.pivot(r * 0.7, 0.6, -0.12 * beak, 1, function () { p.path('M' + (r * 0.7) + ' -2 L' + (r * 0.7 + L) + ' 0.2 C' + (r * 0.7 + L + 0.6) + ' 1.4 ' + (r * 0.7 + L - 0.6) + ' 1.8 ' + (r * 0.7 + L - 1.8) + ' 1.6 L' + (r * 0.7) + ' 0.8 Z', { fill: bill, w: 0.7 }); });
+    p.pivot(r * 0.7, 0.9, 0.42 * beak, 1, function () { p.path('M' + (r * 0.7) + ' 0.9 L' + (r * 0.7 + L - 1.4) + ' 1.8 C' + (r * 0.7 + L - 1) + ' 3 ' + (r * 0.7 + L - 2.2) + ' 3.4 ' + (r * 0.7 + L - 3.2) + ' 3.2 L' + (r * 0.7) + ' 2.8 Z', { fill: bill, w: 0.6 }); });
+  });
+  if (look > 0.02) p.pivot(0, 2, 0, Math.max(0.02, look), function () {
+    p.path('M-2.6 1.4 C-2.6 0 2.6 0 2.6 1.4 L0.9 ' + (L * 0.8) + ' C0.5 ' + (L * 0.8 + 0.8) + ' -0.5 ' + (L * 0.8 + 0.8) + ' -0.9 ' + (L * 0.8) + ' Z', { fill: bill, w: 0.7 });
+    if (beak > 0.1) p.ellipse(0, L * 0.8 + 1.6, 1.8 * beak, 1.4 * beak, { fill: 'night', w: 0.4 });
+  });
+  var eye = function (x) { p.at(x, -1.8, 0, [1, Math.max(0.1, k)], function () { p.dot(0, 0, age === 2 ? 1.7 : 1.9, age === 2 ? 'red' : 'black'); p.dot(0.55, -0.55, 0.6, 'white'); }); };
+  eye(M.lerp(2.2, -2.9, look));
+  if (look > 0.35) eye(2.9);
+}
+function cygnet(p, o) {
+  var age = o.age || 0, look = o.look || 0, neck = o.neck || 0, flap = o.flap || 0, small = p.small, tt = o.t || 0;
+  var H = [[12 + 7 * neck, -16 + 15 * neck], [19 + 10 * neck, -29 + 30 * neck], [27 + 10 * neck, -38 + 36 * neck]][age];
+  p.at(o.x, o.y, o.tilt || 0, o.k || 1, function () {
+    if (o.legs) o.legs(p, true);
+    if (age === 0) {
+      p.blob(-16, -4, 5.5, { fill: DOWN, lumpy: 0.3, seed: 2 });
+      p.blob(0, 0, 16, { fill: DOWN, lumpy: 0.13, seed: 7, sx: 1.12, sy: 0.92 });
+      if (!small) { p.curve([[-9, 7], [-5, 10], [0, 10.5]], { ink: 'grey', w: 0.45, detail: true }); p.curve([[-6, -9], [-1, -12], [4, -11]], { ink: 'grey', w: 0.45, detail: true }); }
+    } else if (age === 1) {
+      p.poly([[-22, -4], [-29, -9], [-24, 0]], { fill: DOWN, w: 0.7 }); p.poly([[-21, -1], [-27, 1], [-22, 4]], { fill: DOWN, w: 0.7 });
+      p.blob(0, 0, 17, { fill: DOWN, lumpy: 0.22, seed: 13, sx: 1.3, sy: 0.84 });
+      [[-12, -7, -1.3], [-4, -11, -1.1], [5, -9, -0.9], [-16, 1, -1.5], [9, 4, -1]].forEach(function (f, i) {
+        if (small && i > 2) return;
+        p.at(f[0], f[1], f[2], 0.9, function () { p.path('M0 0 C-2 -4 -2 -8 0 -10 C2 -8 2 -4 0 0 Z', { fill: 'black', w: 0.5 }); });
+      });
+    } else {
+      p.at(0, 0, 0, 0.82, function () {
+        feather(p, -16, -7, 0.04 + 0.04 * Math.sin(TAU * tt), 11, tt, small);
+        feather(p, -8, -10, 0.3 + 0.03 * Math.sin(TAU * tt + 1), 13, tt + 0.3, small);
+        p.path(SW_BODY, { fill: 'black' });
+        if (!small) p.path('M-17 -1 C-13 -4 -9 -3 -6 -1 C-3 -4 1 -3 4 0', { ink: 'grey', w: 0.5, detail: true });
+      });
+    }
+    if (o.legs) o.legs(p, false);
+    /* the wing: stubs at first, a folded wing too long for the bird at the end */
+    if (age < 2) p.pivot(-2, -3, -0.25 - 1.1 * flap, 1, function () { p.blob(-6, 0, age ? 7.5 : 6, { fill: age ? 'black' : DOWN, lumpy: 0.16, seed: 4, sx: 1.4, sy: 0.65 }); });
+    else if (flap < 0.08) {
+      p.path('M18 -9 C6 -15 -16 -14 -33 -5 C-29 -2 -25 -1 -21 0 C-9 -2 5 -3 18 -5 Z', { fill: 'night' });
+      if (!small) { p.ellipse(-29, -4.5, 4, 1.6, { fill: 'white', w: 0.4, rot: 0.25 }); p.ellipse(-24, -2.5, 3.6, 1.5, { fill: 'white', w: 0.4, rot: 0.15 }); }
+    } else swanWing(p, 3, -9, 0.7 + 0.3 * flap, flap * 0.85, false);
+    var w0 = [11, 8.5, 9][age], w1 = [9.5, 6.4, 6][age], C1 = [[9, -10], [17, -12], [27, -14]][age], C2 = [[H[0] - 2, H[1] + 6], [H[0] - 3, H[1] + 10], [H[0] - 4, H[1] + 14]][age];
+    var sp = bez([[5, -6], [10, -6], [16, -7]][age], C1, C2, H, 10);
+    tube(p, sp, function (s) { return w0 - (w0 - w1) * s; }, { fill: age === 2 ? 'black' : DOWN });
+    p.at(H[0], H[1], 0.9 * neck + (o.head || 0) + 0.1 * look, 1, function () { damHead(p, age, look, o.blink || 0, o.beak || 0, small); });
+  });
+}
+/* Dam's legs on a walk: the foot cycle of hongsa-walk for a hip at hip (body frame); go 0 stands, 1 walks */
+function damLegs(p, o) {
+  return function (_, far) {
+    var u = M.frac(o.t + (far ? 0.5 : 0)), st = u < 0.5, v = st ? u / 0.5 : (u - 0.5) / 0.5;
+    var fx = (st ? M.lerp(o.stride, -o.stride, v) : M.lerp(-o.stride, o.stride, M.ease(v))) * o.go, lift = (st ? 0 : o.lift * M.bump(v)) * o.go;
+    var hx = o.hip[0] + (far ? -3.5 : 0), hy = o.hip[1], c = Math.cos(o.roll), sn = Math.sin(o.roll);
+    swanLeg(p, o.x + hx * c - hy * sn, o.y + hx * sn + hy * c, o.x + o.hip[0] - 1 + fx + (o.fwd || 0), o.G - 1.5 - lift, st || o.go < 0.5 ? 0 : 0.55 * M.bump(v), st ? 1 : 0.3 + 0.7 * (1 - o.go), far, o.big);
+  };
+}
+D.add('duckling', {
+  fam: 'lanna', tags: ['cygnet', 'duckling', 'chick', 'hatchling', 'swan', 'black swan', 'hongdam', 'dam', 'ugly duckling', 'bird', '🐣'], loop: 3, still: 0.1, ratio: 1, burst: 'note', burstAt: [70, 30], burstN: 3, burstSpread: 1.6, burstDelay: 0.2, tapLen: 1.4, tapRest: 0.35, margin: [22, 16, 10, 16],
+  about: "Dam, the black swan's chick: a ball of grey down on black webbed feet too big for it; it waddles, wobbles, sits down hard and gets back up",
+  tapAbout: 'it looks up at you, peeps and flaps its two stubs of wings',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, G = 93, wu = seg(t, 0, 0.52);
+    var go = ez(seg(t, 0, 0.05)) * (1 - ez(seg(t, 0.47, 0.52)));
+    var wob = 0.2 * Math.sin(TAU * 2 * seg(t, 0.52, 0.68)) * (1 - seg(t, 0.52, 0.68));
+    var sit = ez(seg(t, 0.68, 0.73)) * (1 - ez(seg(t, 0.9, 0.97))), squash = bump(seg(t, 0.71, 0.79)) * 0.12;
+    var look = 0, beak = 0, flap = 0, hop = 0, blink = bump(seg(t, 0.82, 0.85)), head = 0.15 * sit;
+    if (s.tap >= 0) {
+      var q = s.tap; look = ez(seg(q, 0, 0.12)) * (1 - ez(seg(q, 0.86, 1)));
+      beak = bump(seg(q, 0.16, 0.34)) + bump(seg(q, 0.4, 0.58)); flap = Math.abs(Math.sin(TAU * 3 * seg(q, 0.2, 0.8))) * bump(seg(q, 0.16, 0.84));
+      hop = 5 * bump(seg(q, 0.18, 0.42)); go *= 0; sit *= 1 - look; wob = 0; head = -0.25 * look;
+    }
+    var ph = TAU * 2 * wu, roll = 0.12 * Math.sin(ph) * go + wob, x = 46, y = 64 - 2 * Math.abs(Math.sin(ph)) * go + 10 * sit - hop;
+    p.ellipse(x + 2, G + 0.5, 17, 2.4, { fill: 'smoke', line: false, alpha: 0.55 });
+    var legs = damLegs(p, { t: M.frac(2 * wu), x: x, y: y, roll: roll, go: go, hip: [1, 12], G: G, stride: 7, lift: 5, big: 1.25, fwd: 5 * sit });
+    p.at(x, y + 14, 0, [1 + squash, 1 - squash], function () {
+      cygnet(p, { x: 0, y: -14, tilt: roll, age: 0, look: look, blink: blink, beak: beak, flap: flap, head: head, t: t, legs: function (pp, far) { pp.at(-x, -y, 0, 1, function () { legs(pp, far); }); } });
+    });
+  }
+});
+D.add('duckling-scruffy', {
+  fam: 'lanna', tags: ['cygnet', 'duckling', 'ugly duckling', 'swan', 'hongdam', 'dam', 'moult', 'bird'], loop: 2.4, still: 0.2, ratio: 1.1, burst: 'drop', burstAt: [80, 70], burstN: 5, burstSpread: 2.2, burstDelay: 0.62, tapLen: 2, tapRest: 0.4, margin: [22, 16, 10, 16],
+  about: 'Dam a few weeks on: a longer neck, patchy grey down with black feathers poking through; it walks along with its head down',
+  tapAbout: 'it finds its reflection in a puddle, looks hard, then shakes it off',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, G = 93, ph = TAU * 2 * t, go = 1, neck = 0.55 + 0.08 * Math.sin(ph * 2), head = 0, look = 0, pud = 0, shake = 0;
+    if (s.tap >= 0) {
+      var q = s.tap; go = 1 - ez(seg(q, 0, 0.1)) * (1 - ez(seg(q, 0.9, 1)));
+      pud = ez(seg(q, 0.05, 0.2)) * (1 - ez(seg(q, 0.82, 0.95)));
+      neck = M.lerp(neck, 0.95, ez(seg(q, 0.1, 0.25)) * (1 - ez(seg(q, 0.55, 0.65))));
+      shake = Math.sin(TAU * 4 * seg(q, 0.58, 0.82)) * bump(seg(q, 0.58, 0.82)); head = 0.35 * shake;
+    }
+    var roll = 0.1 * Math.sin(ph) * go, x = 50, y = 61 - 1.6 * Math.abs(Math.sin(ph)) * go;
+    p.ellipse(x + 2, G + 0.5, 21, 2.5, { fill: 'smoke', line: false, alpha: 0.55 });
+    if (pud > 0.01) { p.ellipse(80, G - 0.5, 15 * pud, 3.2 * pud, { fill: 'sky', alpha: 0.7, w: 0.6 }); if (pud > 0.5 && !p.small) p.ellipse(80, G + 1, 4 * pud, 1.2, { fill: 'grey', line: false, alpha: 0.5 * (1 - Math.abs(shake)) }); }
+    var legs = damLegs(p, { t: t, x: x, y: y, roll: roll, go: go, hip: [1, 13], G: G, stride: 8, lift: 5, big: 1.25 });
+    cygnet(p, { x: x, y: y, tilt: roll, age: 1, neck: neck, head: head, look: look, t: t, legs: function (pp, far) { legs(pp, far); } });
+  }
+});
+D.add('duckling-fledgling', {
+  fam: 'lanna', tags: ['cygnet', 'fledgling', 'swan', 'black swan', 'hongdam', 'dam', 'shy', 'bird'], loop: 4, still: 0.6, ratio: 1.2, burst: false, tapLen: 1.8, tapRest: 0.35, margin: [30, 20, 10, 20],
+  about: 'Dam nearly grown: black, with grey down left on its head and wings too long for it, folded; it walks, stops, glances at you and blinks',
+  tapAbout: 'it half-opens its wings, then folds them again and tucks its head, shy',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, G = 93, wu = seg(t, 0, 0.5);
+    var go = ez(seg(t, 0, 0.05)) * (1 - ez(seg(t, 0.45, 0.5)));
+    var look = ez(seg(t, 0.56, 0.62)) * (1 - ez(seg(t, 0.84, 0.9))), blink = bump(seg(t, 0.7, 0.73)), flap = 0, head = 0, tilt = 0;
+    if (s.tap >= 0) {
+      var q = s.tap; flap = ez(seg(q, 0.05, 0.3)) * (1 - ez(seg(q, 0.45, 0.65))) * 0.6;
+      var shy = ez(seg(q, 0.5, 0.65)) * (1 - ez(seg(q, 0.88, 1))); look = Math.max(look * (1 - shy), 0.5 * ez(seg(q, 0, 0.1)) * (1 - shy)); head = 0.55 * shy; tilt = -0.12 * flap; go = 0;
+      if (shy > 0.3 && !p.small) p.dot(54 + 30, 30 + 18 * shy, 1.6 * shy, 'pink');
+    }
+    var ph = TAU * 2 * wu, roll = 0.1 * Math.sin(ph) * go - 0.1 + tilt, x = 54, y = 65 - 1.8 * Math.abs(Math.sin(ph)) * go;
+    p.ellipse(x + 2, G + 0.5, 22, 2.6, { fill: 'smoke', line: false, alpha: 0.55 });
+    var legs = damLegs(p, { t: M.frac(2 * wu), x: x, y: y, roll: roll, go: go, hip: [0, 13], G: G, stride: 9, lift: 6, big: 1.35 });
+    cygnet(p, { x: x, y: y, tilt: roll, age: 2, look: look, blink: blink, flap: flap, head: head, neck: 0.08 * head, t: t, legs: function (pp, far) { legs(pp, far); } });
+  }
+});
+
+/* a dyed easter egg in the colour a (hongdam.net tints it with the colour of the day), a white zigzag band and
+   white dots painted on. It rocks, and now and then something knocks from inside. Tap: it cracks along the
+   zigzag, the top lifts, and Dam's head pops out, looks at you and peeps, then ducks back and the egg closes. */
+var DYE = 'M40 12 C58 12 66 42 66 60 C66 80 55 92 40 92 C25 92 14 80 14 60 C14 42 22 12 40 12 Z';
+var DYE_TOP = 'M14 54 C14 40 22 12 40 12 C58 12 66 40 66 54 L60 47 L53 55 L47 47 L40 55 L33 47 L27 55 L20 47 Z';
+var DYE_BOT = 'M14 54 L20 47 L27 55 L33 47 L40 55 L47 47 L53 55 L60 47 L66 54 C66 80 55 92 40 92 C25 92 14 80 14 54 Z';
+var ZIG = 'M14 54 L20 47 L27 55 L33 47 L40 55 L47 47 L53 55 L60 47 L66 54';
+function dyePaint(p, small) {
+  p.path('M10 47 L20 40 L27 48 L33 40 L40 48 L47 40 L53 48 L60 40 L70 47 L70 56 L60 49 L53 57 L47 49 L40 57 L33 49 L27 57 L20 49 L10 56 Z', { fill: 'white', line: false });
+  if (!small) [[30, 28], [40, 24], [50, 28], [28, 72], [40, 76], [52, 72]].forEach(function (d) { p.circle(d[0], d[1], 2.3, { fill: 'white', w: 0.4 }); });
+  p.path('M54 18 C60 26 63 38 63 52', { ink: 'white', w: 1.2, alpha: 0.6, detail: true });
+}
+D.add('easter-egg', {
+  fam: 'lanna', tags: ['egg', 'easter egg', 'dyed', 'painted', 'hatch', 'hongdam', 'dam', 'surprise', 'ไข่', '🥚'], loop: 2.6, still: 0.1, ratio: 0.8, burst: 'note', burstAt: [40, 28], burstN: 3, burstSpread: 1.6, burstDelay: 0.5, tapLen: 2.6, tapRest: 0.55, margin: [30, 14, 8, 14],
+  about: 'a dyed egg with a painted zigzag rocks on its round bottom; now and then it jiggles, as if something inside knocked',
+  tapAbout: "it cracks along the zigzag, the top lifts, and Dam's head pops out, looks at you and peeps, then ducks back in and the egg closes",
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, rock = 0.08 * M.wave(t, 1) + 0.05 * Math.sin(TAU * 6 * seg(t, 0.55, 0.72)) * bump(seg(t, 0.55, 0.72));
+    p.ellipse(40, 93, 20, 2.6, { fill: 'stone', line: false, alpha: 0.6 });
+    if (s.tap < 0) {
+      p.pivot(40, 90, rock, 1, function () { p.path(DYE, { fill: 'a' }); p.clip(DYE, function () { dyePaint(p, p.small); }); p.path(DYE, {}); });
+      return;
+    }
+    var q = s.tap, shake = 0.08 * Math.sin(TAU * 5 * seg(q, 0, 0.14)) * bump(seg(q, 0, 0.14)), crack = ez(seg(q, 0.12, 0.26)) * (1 - ez(seg(q, 0.9, 0.98)));
+    var lift = ez(seg(q, 0.26, 0.38)) * (1 - ez(seg(q, 0.8, 0.9))), pop = M.spring(seg(q, 0.32, 0.5)) * (1 - ez(seg(q, 0.74, 0.84)));
+    var look = ez(seg(q, 0.42, 0.5)) * (1 - ez(seg(q, 0.7, 0.76))), beak = bump(seg(q, 0.5, 0.6)), blink = bump(seg(q, 0.62, 0.66));
+    p.pivot(40, 90, shake, 1, function () {
+      if (lift > 0.01) p.ellipse(40, 51, 25, 5, { fill: 'night', line: false, alpha: 0.7 });
+      if (pop > 0.01) p.clip('M0 -60 L80 -60 L80 52 L0 52 Z', function () { p.at(40, 64 - 22 * pop, 0, 1.1, function () { damHead(p, 0, look, blink, beak, p.small); }); });
+      p.path(DYE_BOT, { fill: 'a' }); p.clip(DYE_BOT, function () { dyePaint(p, p.small); }); p.path(DYE_BOT, {});
+      p.pivot(16, 52, -0.55 * lift, 1, function () { p.at(0, -12 * lift, 0, 1, function () { p.path(DYE_TOP, { fill: 'a' }); p.clip(DYE_TOP, function () { dyePaint(p, p.small); }); p.path(DYE_TOP, {}); }); });
+      if (crack > 0.01 && lift < 0.02) p.draw(ZIG, crack, { w: 0.9 });
+    });
+  }
+});
 })(Dingbats);

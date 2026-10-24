@@ -1193,4 +1193,62 @@ D.add('fern', {
     p.path('M16 98 C34 96 66 96 84 98', { w: 0.6 });
   }
 });
+/* a white farm duck (the ducks of the paddy in hongdam.net's egg story): orange bill and feet, a curled-up tail.
+   It waddles. Tap: it quacks, bill wide, three sound lines. */
+D.add('duck', {
+  fam: 'nature', tags: ['duck', 'farm', 'quack', 'pekin', 'bird', 'paddy', 'waddle', 'เป็ด', '🦆'], loop: 1, still: 0.25, ratio: 1.1, burst: false, tapLen: 1.2, tapRest: 0.3, margin: [16, 22, 10, 14],
+  about: 'a white farm duck waddles, rolling side to side, its curled tail wagging', tapAbout: 'it stretches its neck and quacks twice, bill wide, sound lines coming out',
+  draw: function (p, t, s) {
+    var G = 93, ph = TAU * t, go = 1, quack = 0, reach = 0, i;
+    if (s.tap >= 0) { var q = s.tap; go = 1 - eo(seg(q, 0, 0.1)) * (1 - eo(seg(q, 0.88, 1))); quack = bump(seg(q, 0.15, 0.4)) + bump(seg(q, 0.48, 0.73)); reach = bump(seg(q, 0.08, 0.85)); }
+    var roll = 0.1 * Math.sin(ph) * go, by = -1.5 * Math.abs(Math.sin(ph)) * go;
+    p.ellipse(50, G + 0.5, 26, 2.6, { fill: 'smoke', line: false, alpha: 0.55 });
+    [0, 0.5].forEach(function (o, k) {
+      var u = M.frac(t + o), lift = (u > 0.5 ? 5 * bump((u - 0.5) * 2) : 0) * go, fx = (u < 0.5 ? lerp(5, -5, u * 2) : lerp(-5, 5, (u - 0.5) * 2)) * go, hx = 46 + (k ? -5 : 2);
+      p.line(hx, 76 + by, hx + fx, G - 2 - lift, { ink: 'gold', w: 1.6, cap: 'round' });
+      p.at(hx + fx, G - 2 - lift, lift > 1 ? 0.4 : 0, 1, function () { p.path('M-2 0 L9 -4 Q12 0 9 4 Z', { fill: 'gold', w: 0.6 }); });
+    });
+    p.pivot(46, 76, roll, 1, function () {
+      p.move(0, by);
+      p.pivot(22, 56, 0.15 * Math.sin(2 * ph) * go, 1, function () { p.path('M24 56 C16 52 13 45 16 40 C19 46 23 50 28 52 Z', { fill: 'white', w: 0.8 }); p.curve([[16, 40], [13, 38], [15, 35]], { w: 0.7 }); });
+      p.path('M22 60 C20 47 33 42 48 43 C60 44 68 48 72 56 C76 66 70 76 58 79 C44 82 28 79 22 72 C19 68 19 63 22 60 Z', { fill: 'white' });
+      p.path('M33 54 C43 49 56 51 61 59 C53 65 41 65 32 60 Z', { fill: 'white', w: 0.7 });
+      if (!p.small) { p.curve([[38, 60], [46, 62], [55, 60]], { w: 0.4, detail: true }); p.curve([[40, 57], [47, 58], [54, 57]], { w: 0.4, detail: true }); }
+      var hx = 74 + 4 * reach, hy = 27 - 3 * reach;
+      p.path('M58 53 C60 44 ' + (hx - 9) + ' ' + (hy + 12) + ' ' + (hx - 7) + ' ' + (hy + 2) + ' L' + (hx + 4) + ' ' + (hy + 4) + ' C' + (hx + 1) + ' ' + (hy + 14) + ' 70 44 70 56 Z', { fill: 'white' });
+      p.at(hx, hy, -0.1 * reach, 1, function () {
+        p.ellipse(0, 0, 9, 8, { fill: 'white' });
+        p.pivot(6, -0.5, -0.14 * quack, 1, function () { p.path('M6 -2.5 L18 -1 C19.5 0.6 18.6 2 17 2 L6 1.2 Z', { fill: 'gold', w: 0.7 }); });
+        p.pivot(6, 1.5, 0.5 * quack, 1, function () { p.path('M6 1.2 L16.4 2.2 C17.2 3.6 16.2 4.6 14.6 4.4 L6 3.6 Z', { fill: 'gold', w: 0.6 }); });
+        p.dot(2.5, -2.5, 1.6, 'black'); p.dot(3, -3, 0.55, 'white');
+      });
+      if (quack > 0.15) for (i = 0; i < 3; i++) p.draw('M' + (hx + 22 + i * 4) + ' ' + (hy - 6 - i * 2) + ' Q' + (hx + 26 + i * 5) + ' ' + (hy + 1) + ' ' + (hx + 22 + i * 4) + ' ' + (hy + 8 + i * 2), Math.min(1, quack * 1.3 - i * 0.15), { w: 0.8 });
+    });
+  }
+});
+
+/* one black swan feather: the vane in the ink colour (a page can set ink to gold), the quill and barbs knocked out
+   in the paper colour, a little fluff at the base. It drifts and turns in the air. Tap: it spins. */
+D.add('feather', {
+  fam: 'nature', tags: ['feather', 'quill', 'swan', 'black swan', 'bird', 'light', 'float', 'hongdam', '🪶'], loop: 3, still: 0.2, ratio: 0.6, burst: false, tapLen: 1.2, tapRest: 0.5, margin: [16, 20, 16, 20],
+  about: 'a single black swan feather drifts back and forth, turning a little, as if falling slowly', tapAbout: 'it spins round once and settles',
+  draw: function (p, t, s) {
+    var spin = s.tap >= 0 ? TAU * eo(s.tap) : 0, sway = 0.32 * W(t, 1), dx = 6 * W(t, 1, 0.25), dy = 2.5 * W(t, 2);
+    p.pivot(30, 50, sway + spin, 1, function () {
+      p.move(dx, dy);
+      var S = function (v) { return bz([31, 94], [27, 62], [29, 30], [40, 6], v); }, L = [], R = [], v, a, b, d, wl, wr, i;
+      for (i = 0; i <= 20; i++) {
+        v = 0.12 + 0.88 * i / 20; a = S(Math.max(0, v - 0.02)); b = S(Math.min(1, v + 0.02)); d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        wl = 11 * Math.pow(Math.sin(Math.PI * Math.min(1, (v - 0.1) * 1.05)), 0.7); wr = 7.5 * Math.pow(Math.sin(Math.PI * Math.min(1, (v - 0.1) * 1.05)), 0.8);
+        var m = S(v); L.push([m[0] - (b[1] - a[1]) / d * wl, m[1] + (b[0] - a[0]) / d * wl]); R.unshift([m[0] + (b[1] - a[1]) / d * wr, m[1] - (b[0] - a[0]) / d * wr]);
+      }
+      p.poly(L.concat(R), { fill: 'ink', w: 0.6 });
+      var q = []; for (i = 0; i <= 16; i++) q.push(S(0.1 + 0.85 * i / 16));
+      p.curve(q, { ink: 'bg', w: 0.8, wob: 0.3 });
+      if (!p.small) [0.3, 0.42, 0.55, 0.68].forEach(function (u, k) { var m = S(u); p.line(m[0], m[1], m[0] - 8, m[1] + 3 - k, { ink: 'bg', w: 0.35 }); p.line(m[0], m[1], m[0] + 6, m[1] + 2.5 - k, { ink: 'bg', w: 0.35 }); });
+      p.line(31, 94, 30.4, 84, { w: 1.3 });
+      if (!p.small) { p.curve([[30.5, 86], [26, 83], [24, 86]], { w: 0.45 }); p.curve([[30.8, 84], [35, 81], [37, 84]], { w: 0.45 }); }
+    });
+  }
+});
 })(Dingbats);
