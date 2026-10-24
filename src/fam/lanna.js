@@ -1099,7 +1099,7 @@ function swanEye(p, x, y, k) { p.at(x, y, 0, [1, Math.max(0.1, k)], function () 
 /* the head at its own origin, facing +x; turn 0 in profile, 1 looking straight at you; open 0..1 the bill open (a honk) */
 function swanHead(p, turn, blink, small, open) {
   var side = 1 - turn, k = 1 - blink, op = open || 0;
-  p.ellipse(0, 0, 7 - 1.2 * turn, 4.9 + 1.2 * turn, { fill: 'black', rot: -0.16 * side });
+  p.ellipse(0, 0, 6.4 - 1.1 * turn, 4.3 + 1.2 * turn, { fill: 'black', rot: -0.2 * side });
   if (side > 0.02) p.pivot(4.6, 0, 0, [Math.max(0.02, side), 1], function () {
     if (op > 0.02) {
       p.pivot(4.6, 1.6, 0.5 * op, 1, function () { p.path('M4.6 1.2 L16.8 3 C16.6 4.8 13.8 5.4 11.6 5.1 L4.6 3.8 Z', { fill: 'red', w: 0.8 }); });
@@ -1131,7 +1131,7 @@ function swanLeg(p, hx, hy, ax, ay, fa, spread, far, big, alpha) {
 }
 /* the body: a long low boat, the tail end raised and pointed, a full breast, a flat keel. A swan stands low on short
    legs set far back (a long neck on a body raised on long legs reads as an ostrich: Michael, 2026-10-24) */
-var SW_BODY = 'M-40 -7 C-31 -15 -9 -18 11 -15 C25 -13 35 -6 34 3 C33 11 20 16 2 16 C-16 16 -31 10 -40 -7 Z';
+var SW_BODY = 'M-44 -8 C-34 -16 -10 -19 12 -16 C27 -14 37 -6 36 3 C35 11 21 15 2 15 C-17 15 -33 9 -44 -8 Z';
 /* the poses give a standing body's centre at y 66; it is drawn this much lower, so the legs show short */
 var SW_DY = 4;
 /* where the feet stand, from the body's centre: near, far */
@@ -1158,7 +1158,7 @@ function swan(p, o) {
     if (!p.small && wings < 0.3 && !o.wing) p.path('M-25 -4 C-20 -7 -15 -6 -11 -4 C-7 -7 -2 -6 2 -3 C6 -6 10 -5 14 -2', { ink: 'grey', w: 0.5, detail: true });
     if (o.legs) o.legs(p, false);
     var sp = bez([25, -9], N.C1, N.C2, N.H, 18);
-    tube(p, sp, function (s) { return 10.6 - 4.6 * Math.pow(s, 0.8); }, { fill: 'black', w: 0.7 });
+    tube(p, sp, function (s) { return 9.6 - 5 * Math.pow(s, 0.7); }, { fill: 'black', w: 0.7 });
     p.at(N.H[0], N.H[1], ha, face < 0 ? [-1, 1] : 1, function () { swanHead(p, 1 - Math.abs(face), o.blink || 0, p.small, o.open); });
     if (o.wing) o.wing(p, false); else swanWing(p, 0, -11, 0.75 + flap * 0.65, wings * 1.2, false);
   });
@@ -1258,11 +1258,11 @@ D.add('hongsa-stand', {
    Poses of the neck and head for swan(o.N), in the body frame: H the head, C1 C2 the neck's curve up from the
    chest, a the head's angle, face 1 forward, 0 at you, -1 back over its shoulder. */
 var NK = {
-  rest: { H: [35, -50], C1: [41, -24], C2: [17, -40], a: 0.4, face: 1 },
-  at: { H: [34, -48], C1: [41, -24], C2: [18, -40], a: 0.08, face: 0 },
+  rest: { H: [31, -62], C1: [47, -30], C2: [8, -50], a: 0.75, face: 1 },
+  at: { H: [30, -60], C1: [47, -30], C2: [10, -50], a: 0.1, face: 0 },
   dive: { H: [43, 6], C1: [34, -8], C2: [41, -4], a: 1.2, face: 1 },
   up: { H: [46, -70], C1: [40, -26], C2: [30, -54], a: -0.95, face: 1 },
-  peek: { H: [41, -58], C1: [41, -25], C2: [24, -46], a: -0.35, face: 1 },
+  peek: { H: [38, -68], C1: [46, -30], C2: [16, -56], a: -0.1, face: 1 },
   honk: { H: [53, -48], C1: [43, -20], C2: [34, -40], a: -0.4, face: 1 },
   bow: { H: [48, -4], C1: [43, -20], C2: [55, -34], a: 1.45, face: 1 },
   ground: { H: [50, 7], C1: [38, -16], C2: [55, -22], a: 1.5, face: 1 },
@@ -1271,7 +1271,7 @@ var NK = {
   nuzzle: { H: [51, -32], C1: [42, -20], C2: [57, -46], a: 1.2, face: 1 },
   heart: { H: [33, -60], C1: [0, -28], C2: [6, -84], a: 1.35, face: 1 },
   /* hurrying: the neck reaches forward; flying: straight out in front, the head level */
-  hurry: { H: [52, -38], C1: [42, -16], C2: [37, -34], a: 0.18, face: 1 },
+  hurry: { H: [40, -56], C1: [48, -26], C2: [18, -48], a: 0.6, face: 1 },
   fly: { H: [70, -15], C1: [42, -12], C2: [56, -15], a: 0.1, face: 1 }
 };
 function nk(A, B, u) {
@@ -1487,7 +1487,7 @@ function waterMarks(p, r, X, top, G) {
 function goSwan(p, t, s, r) {
   var G = 93, X = 54, W = r.wy == null ? 93 : r.wy - (r.lw || 15) / 2, w = r.w || 0, alt = r.alt || 0, fly = r.fly || 0, A = r.act, seg = M.seg, ez = M.ease, bump = M.bump;
   /* W: the water's surface, the top of the line it swims in; afloat, a quarter of the body is under it */
-  var o = { x: X, y: M.lerp(66, W - 12, w) - alt - (r.bob || 0), tilt: M.lerp(M.lerp(-0.14, -0.05, w), 0.04, fly) + (r.tilt || 0) + (r.roll || 0), blink: r.blink || 0, open: r.open || 0, sway: r.sway || 0, t: t };
+  var o = { x: X, y: M.lerp(66, W - 12, w) - alt - (r.bob || 0), tilt: M.lerp(M.lerp(-0.09, -0.04, w), 0.04, fly) + (r.tilt || 0) + (r.roll || 0), blink: r.blink || 0, open: r.open || 0, sway: r.sway || 0, t: t };
   var N = NK.rest, pad = r.pad, kick = 1, after = null;
   if (r.hurry) N = nk(N, NK.hurry, r.hurry);
   if (fly) N = nk(N, NK.fly, fly);
