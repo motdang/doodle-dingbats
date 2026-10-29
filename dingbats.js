@@ -9549,6 +9549,843 @@ D.add('rosette', {
 });
 })(Dingbats);
 
+/* Daily: the ordinary, useful things of a Thai day — money in the hand, a boat, a vest, a helmet, the smoky season, a SIM, a mosquito, a bowl of rice, a headband, a foot rub, a paddy. */
+(function (D) {
+'use strict';
+var M = D.math, TAU = M.TAU, PI = Math.PI, sin = Math.sin, cos = Math.cos;
+
+/* ---------------------------------------------------------------- shared bits */
+/* the convex outline of a cloud of points: the band of a coin, which is two faces and what joins them */
+function hull(P) {
+  var lo = [], up = [], i;
+  P = P.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+  function cr(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+  for (i = 0; i < P.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], P[i]) <= 0) lo.pop(); lo.push(P[i]); }
+  for (i = P.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], P[i]) <= 0) up.pop(); up.push(P[i]); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+/* digits as strokes, each in a cell 6 wide and 10 tall with its corner at the origin */
+var DIG = [
+  'M3 0 C0 0 0 3 0 5 C0 7 0 10 3 10 C6 10 6 7 6 5 C6 3 6 0 3 0 Z',
+  'M1 2.4 L3.6 0 L3.6 10',
+  'M0.3 2.6 C0.5 -0.4 5.8 -0.6 5.8 3 C5.8 5.6 1.5 7.4 0 10 L6 10',
+  'M0.4 1.4 C3 -0.8 6 0.6 5.6 3 C5.4 4.6 3.4 5 2.4 5 C4 5 6.2 5.8 5.8 7.6 C5.4 10.2 1.6 10.6 0 8.6',
+  'M4.4 10 L4.4 0 L0 6.8 L6.4 6.8',
+  'M5.6 0 L1 0 L0.6 4.6 C3 3.2 6 4.2 6 7 C6 9.8 2 11 0 8.8',
+  'M5.4 1 C2 -0.6 0 2 0 6 C0 10.4 6 10.6 6 7 C6 4 1.5 3.6 0.2 6.4',
+  'M0 0.2 L6 0.2 L2.4 10',
+  'M3 5 C0 4.6 0.2 0 3 0 C5.8 0 6 4.6 3 5 C0 5.4 -0.2 10 3 10 C6.2 10 6 5.4 3 5',
+  'M6 10 C3 10 0 8 0 4 C0 -0.4 6 -0.6 6 3 C6 6 1.5 6.4 0 3.6'
+];
+/* a number written with its top-left corner at (x, y), h tall, w the weight of the pen */
+function num(p, str, x, y, h, w, ink) {
+  var k = h / 10, adv = 8.4 * k;
+  for (var i = 0; i < str.length; i++) {
+    p.at(x + i * adv, y, 0, k, function () { p.path(DIG[+str.charAt(i)], { w: w, cap: 'round', ink: ink || 'ink', wob: 0.3 }); });
+  }
+}
+/* ฿ drawn as strokes: a B with one straight line through it, centred at the origin, about 24 tall at k = 1 */
+function baht(p, k, w, ink) {
+  p.at(0, 0, 0, k, function () {
+    var o = { w: w, cap: 'round', ink: ink || 'ink', wob: 0.3 };
+    p.path('M-4.5 -9 L1.5 -9 C6 -9 6 -0.6 1.5 -0.6 L-4.5 -0.6', o);
+    p.path('M-4.5 -0.6 L2.5 -0.6 C7.8 -0.6 7.8 9 2.5 9 L-4.5 9 L-4.5 -9', o);
+    p.line(-0.8, -12, -0.8, 12, o);
+  });
+}
+/* a ring of expanding sound, drawn arcs: the chime of a thing paid */
+function chime(p, x, y, ph, dir) {
+  [0, 1].forEach(function (k) {
+    var u = M.seg(ph, k * 0.12, 0.7 + k * 0.12), r = 7 + 9 * M.easeOut(u) + k * 6;
+    if (u > 0 && u < 1) p.span('M' + (x + dir * r * cos(-0.9)) + ' ' + (y + r * sin(-0.9)) + ' A' + r + ' ' + r + ' 0 0 ' + (dir > 0 ? 1 : 0) + ' ' + (x + dir * r * cos(0.9)) + ' ' + (y + r * sin(0.9)), M.easeIn(M.seg(u, 0.5, 1)), M.easeOut(M.seg(u, 0, 0.5)), { w: 0.9, ink: 'a', cap: 'round' });
+  });
+}
+
+/* a flat ribbon along a spine, w0 wide at the start and w1 at the end: ribbons, cords, straps */
+function strap(p, sp, w0, w1, o) {
+  var n = sp.length, L = [], R = [], i, a, b, d, h;
+  for (i = 0; i < n; i++) {
+    a = sp[Math.max(0, i - 1)]; b = sp[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; h = (w0 + (w1 - w0) * i / (n - 1)) / 2;
+    L.push([sp[i][0] - (b[1] - a[1]) / d * h, sp[i][1] + (b[0] - a[0]) / d * h]); R.unshift([sp[i][0] + (b[1] - a[1]) / d * h, sp[i][1] - (b[0] - a[0]) / d * h]);
+  }
+  return p.curve(L.concat(R), Object.assign({ close: true }, o));
+}
+/* a wavy line of points across x0..x1, sliding along as ph runs on */
+function swell(x0, x1, y, amp, lam, ph, step) { var a = [], x; for (x = x0; x <= x1 + 0.1; x += step || 5) a.push([x, y + amp * sin(TAU * (x / lam + ph))]); return a; }
+
+/* the pen's own parts (move, turn, size) set up any 2 × 2 map x' = a x + c y, y' = b x + d y about (e, f): a turn, a stretch, a turn */
+function affine(p, a, b, c, d, e, f) {
+  var E = (a + d) / 2, F = (a - d) / 2, G = (c + b) / 2, H = (b - c) / 2, Q = Math.sqrt(E * E + H * H), R = Math.sqrt(F * F + G * G), a1 = Math.atan2(G, F), a2 = Math.atan2(H, E);
+  p.move(e, f); p.turn((a2 + a1) / 2); p.size(Q + R, Q - R); p.turn((a2 - a1) / 2);
+}
+
+/* ---------------------------------------------------------------- baht */
+/* a baht coin as a real disc in space: turned about the vertical (ph) and tipped about the horizontal (th). Its band is the
+   outline of the two faces pushed apart along the normal; the face toward us is drawn on top, the ฿ on it, mirrored the way a
+   coin is when we see it from behind. The coin rests on its edge on y = 84, wherever it leans. */
+function disc(p, cx, ground, R, T, ph, th, lift) {
+  var cs = cos(ph), sn = sin(ph), ct = cos(th), st = sin(th), i, a, u, v, P = [], A = [], B = [], h = T / 2, base = 0;
+  for (i = 0; i < 20; i++) {
+    a = i / 20 * TAU; u = R * cos(a); v = R * sin(a);
+    A.push([h * sn + cs * u, h * cs * st - sn * st * u + ct * v]); B.push([-h * sn + cs * u, -h * cs * st - sn * st * u + ct * v]);
+  }
+  P = A.concat(B); P.forEach(function (q) { base = Math.max(base, q[1]); });
+  var cy = ground - base - lift, front = cs * ct >= 0, g = front ? 1 : -1;
+  var H = hull(P).map(function (q) { return [cx + q[0], cy + q[1]]; });
+  p.ellipse(cx, ground + 2.5, 14 + 7 * Math.abs(sn) - 5 * lift / 30, 3.4 - lift / 30 * 1.4, { fill: 'smoke', line: false });
+  p.poly(H, { fill: 'gold', w: 1.1 });
+  p.push();
+  affine(p, g * cs, g * -sn * st, 0, ct, cx + g * h * sn, cy + g * h * cs * st);
+  p.circle(0, 0, R, { fill: 'gold', w: 1.1 });
+  p.circle(0, 0, R * 0.7, { fill: front ? 'stone' : 'smoke', w: 0.6 });
+  p.circle(0, 0, R * 0.62, { w: 0.35, detail: true, alpha: 0.7 });
+  if (front) baht(p, R / 24 * 0.9, 1.15 + (p.small ? 0.25 : 0));
+  else {
+    p.path('M-1.6 9 L-1.6 -1 C-1.6 -5 -0.6 -8 0 -11 C0.6 -8 1.6 -5 1.6 -1 L1.6 9 Z', { w: 0.8 });
+    p.path('M-7 9 L-7 3 C-7 0 -5.4 -3 -5 -5 C-4.6 -3 -3.4 0 -3.4 3 L-3.4 9', { w: 0.7 }); p.path('M7 9 L7 3 C7 0 5.4 -3 5 -5 C4.6 -3 3.4 0 3.4 3 L3.4 9', { w: 0.7 });
+    p.line(-10, 9, 10, 9, { w: 0.9 });
+  }
+  /* the glint: a star of light that opens only when the face looks straight at us */
+  var gl = Math.pow(Math.abs(cs * ct), 8);
+  if (gl > 0.05) { var gx = -R * 0.46, gy = -R * 0.5, r1 = 6.5 * gl; p.poly([[gx, gy - r1], [gx + r1 * 0.2, gy - r1 * 0.2], [gx + r1, gy], [gx + r1 * 0.2, gy + r1 * 0.2], [gx, gy + r1], [gx - r1 * 0.2, gy + r1 * 0.2], [gx - r1, gy], [gx - r1 * 0.2, gy - r1 * 0.2]], { fill: 'white', line: false }); }
+  p.pop();
+}
+D.add('baht', {
+  fam: 'daily', tapRest: 0.6, tags: ['baht', 'thb', 'coin', 'money', 'price', 'cash', 'pay', 'cost', 'currency', 'thai', 'บาท', 'เหรียญ', '฿'], loop: 1.6, still: 0, tapLen: 1.5, burst: 'star', burstAt: [50, 72], burstN: 6, burstSpread: 1.8, burstDelay: 0.66, burstColor: 'gold',
+  margin: [18, 18, 10, 18], about: 'a baht coin spinning on its edge, the ฿ turning edge-on and back, a glint when it faces you', tapAbout: 'it leans back, leaps and turns over once in the air, lands on its edge with a ring of stars and goes on spinning',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), tapping = s.tap >= 0, R = 29, ph = TAU * 2 * t, th = 0.1 + 0.07 * M.wave(t, 1, 0.1), lift = 0, a;
+    if (tapping) {
+      var lean = M.ease(M.seg(tp, 0, 0.12)) * (1 - M.ease(M.seg(tp, 0.12, 0.2)));
+      a = M.seg(tp, 0.12, 0.66);
+      lift = 34 * 4 * a * (1 - a);
+      th += 0.42 * lean + TAU * M.ease(a);
+      var land = M.seg(tp, 0.66, 1), settle = Math.exp(-5 * land) * sin(TAU * 2.5 * land);
+      th += 0.34 * settle * (land > 0 ? 1 : 0);
+    }
+    disc(p, 50, 84, R, 4.4, ph, th, lift);
+  }
+});
+
+/* ---------------------------------------------------------------- qr-pay */
+/* a QR code, its corner at (x, y), 26 square: three finders and modules that never change */
+function qr(p, x, y, ink) {
+  var i, j, c = 2;
+  [[0, 0], [16, 0], [0, 16]].forEach(function (f) {
+    p.rect(x + f[0], y + f[1], 10, 10, { w: 0.8, ink: ink });
+    p.rect(x + f[0] + 3, y + f[1] + 3, 4, 4, { fill: ink, line: false });
+  });
+  for (i = 0; i < 13; i++) for (j = 0; j < 13; j++) {
+    if ((i < 6 && j < 6) || (i > 7 && j < 6) || (i < 6 && j > 7)) continue;
+    if ((i * 5 + j * 3 + i * j) % 4 < 2) p.rect(x + i * c, y + j * c, c * 0.92, c * 0.92, { fill: ink, line: false, detail: true });
+  }
+}
+D.add('qr-pay', {
+  fam: 'daily', tapRest: 0.5, tags: ['qr', 'qr code', 'scan', 'pay', 'payment', 'phone', 'baht', 'checkout', 'shop', 'stall', 'transfer', 'จ่าย', 'สแกน', 'คิวอาร์'], loop: 2.4, still: 0.3, tapLen: 2.2, burst: 'note', burstAt: [40, 30], burstN: 3, burstSpread: 1.6, burstDelay: 0.16, burstColor: 'gold',
+  margin: [22, 14, 8, 8], about: 'a phone leans in and out at a QR stand, a green line sweeping the code', tapAbout: 'the phone snaps in, its screen floods green with a drawn tick and the ฿ amount, a chime rings out and the stand gets its tick',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, lean = 0.17 + 0.035 * M.wave(t, 1, 0.1), dx = 2.4 * M.wave(t, 1), dy = 0.8 * M.wave(t, 2, 0.2);
+    var wipe = 0, tick = 0, badge = 0, i;
+    if (tapping) {
+      dx += 4 * M.spring(M.seg(u, 0, 0.2)) * (1 - M.ease(M.seg(u, 0.74, 0.96)));
+      wipe = M.ease(M.seg(u, 0.12, 0.34)) * (1 - M.ease(M.seg(u, 0.8, 0.96)));
+      tick = M.easeIn(M.seg(u, 0.84, 0.97)); badge = M.spring(M.seg(u, 0.3, 0.52)) * (1 - M.ease(M.seg(u, 0.8, 0.96)));
+    }
+    var cx = 27 + dx, cy = 66 + dy, c = cos(lean), sn = sin(lean);
+    function wp(x, y) { return [cx + x * c - y * sn, cy + x * sn + y * c]; }
+    /* the stand */
+    p.rect(60, 86, 30, 6, { fill: 'stone', r: 2, w: 0.9 });
+    p.rect(58, 12, 34, 76, { fill: 'white', r: 4, w: 1 });
+    p.path('M58 26 L58 16 C58 13.5 60 12 62 12 L88 12 C90 12 92 13.5 92 16 L92 26 Z', { fill: 'navy', w: 0.8 });
+    p.line(63, 17, 77, 17, { w: 1, ink: 'white', cap: 'round' }); p.line(63, 22, 71, 22, { w: 0.7, ink: 'white', cap: 'round', detail: true }); p.circle(85, 19, 3.2, { fill: 'gold', w: 0.6 });
+    qr(p, 62, 31, 'ink');
+    if (badge > 0.02) p.rect(60.5, 29.5, 31, 31, { fill: 'green', line: false, alpha: 0.28 * Math.min(1, badge) });
+    p.at(72.5, 68, 0, 1, function () { baht(p, 0.4, 0.72); });
+    num(p, '50', 77, 63.5, 9, 0.7);
+    p.line(63, 79, 87, 79, { w: 0.6, ink: 'grey', detail: true });
+    /* what the camera sees: a beam from the phone's top edge to the code */
+    var cam = wp(6, -27);
+    p.line(cam[0], cam[1], 62, 33, { w: 0.5, dash: [2, 2.4], dashOff: -t * 4.4, ink: 'leaf', detail: true });
+    p.line(cam[0], cam[1], 62, 57, { w: 0.5, dash: [2, 2.4], dashOff: -t * 4.4, ink: 'leaf', detail: true });
+    /* the scan line, until the payment lands */
+    var ly = 32 + 24 * (0.5 + 0.5 * M.wave(t, 1, -0.25)), keep = tapping ? 1 - M.ease(M.seg(u, 0.1, 0.3)) : 1;
+    if (keep > 0.02) { p.rect(62, ly - 3, 26, 6, { fill: 'leaf', line: false, alpha: 0.22 * keep, detail: true }); p.line(61, ly, 89, ly, { w: 1.1, ink: 'leaf', cap: 'round' }); }
+    if (badge > 0.02) p.at(88, 15, 0, badge, function () { p.circle(0, 0, 7.5, { fill: 'leaf', w: 1 }); p.path('M-3.6 0.4 L-0.8 3.2 L3.8 -2.6', { w: 1.5, ink: 'white', cap: 'round' }); });
+    if (tapping) chime(p, cam[0] + 8, cam[1] + 2, M.seg(u, 0.16, 0.9), 1);
+    /* the phone */
+    p.at(cx, cy, lean, 1, function () {
+      p.rect(-14, -27, 28, 54, { fill: 'night', r: 5, w: 1.05 });
+      p.rect(-11.5, -22, 23, 44, { fill: 'cream', r: 2, w: 0.5 });
+      p.line(-3, -24.5, 3, -24.5, { w: 0.7, ink: 'grey', cap: 'round', detail: true });
+      var k = 1 + 0.045 * M.wave(t, 2, 0.15);
+      p.pivot(0, -5, 0, k, function () {
+        [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (q) { p.path('M' + (q[0] * 8) + ' ' + (-5 + q[1] * 4) + ' L' + (q[0] * 8) + ' ' + (-5 + q[1] * 9) + ' L' + (q[0] * 8 - q[0] * 4.5) + ' ' + (-5 + q[1] * 9), { w: 1.1, ink: 'leaf', cap: 'round' }); });
+        p.rect(-5, -10, 4, 4, { fill: 'ink', line: false }); p.rect(1, -10, 4, 4, { fill: 'ink', line: false }); p.rect(-5, -4, 4, 4, { fill: 'ink', line: false }); p.rect(1.5, -3.5, 2.5, 2.5, { fill: 'ink', line: false, detail: true });
+      });
+      p.rect(-7, 12, 14, 4, { fill: 'smoke', r: 2, line: false, detail: true });
+      if (wipe > 0.01) p.clip(function () { p.rect(-11.5, -22, 23, 44, { r: 2 }); }, function () {
+        p.circle(0, -2, 34 * wipe, { fill: 'leaf', line: false });
+        p.span('M-7 -8 L-2.5 -2.5 L7.5 -14', M.easeIn(M.seg(u, 0.8, 0.92)), M.easeOut(M.seg(u, 0.3, 0.46)), { w: 2.2, ink: 'white', cap: 'round' });
+      });
+      if (wipe > 0.6) { p.at(-3.5, 11, 0, 1, function () { baht(p, 0.34, 0.9, 'white'); }); num(p, '50', 1.6, 7, 7, 0.65, 'white'); }
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- longtail */
+/* เรือหางยาว: the hull is long, low and narrow with a prow that sweeps up high, ribbons and a marigold garland tied at its tip;
+   a car engine sits on the stern and its shaft runs out behind into the water. */
+var HULL = 'M54 58 L98 58 C110 58 124 48 135 37 C138 34 141 32 144 31 C143 37 142 43 139 49 C133 61 121 70 105 73 L62 73 C57 73 54.5 66 54 58 Z';
+D.add('longtail', {
+  fam: 'daily', tapRest: 0.55, tags: ['longtail', 'long tail', 'boat', 'river', 'island', 'krabi', 'phuket', 'ferry', 'sea', 'tour', 'wake', 'เรือหางยาว', 'เรือ'], loop: 2, still: 0.1, ratio: 1.6, tapLen: 2.2, burst: 'drop', burstAt: [14, 66], burstN: 7, burstSpread: 1.7, burstDelay: 0.3, burstColor: 'sky', burstGravity: 110,
+  margin: [26, 6, 8, 10], about: 'a longtail boat rocks on the water, ribbons streaming off the prow, the engine shaking, spray flying off the propeller', tapAbout: 'the engine coughs black smoke twice, then the boat surges: the bow lifts, the ribbons stream straight back and the spray doubles',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, k, ph;
+    p.move(5, 0);
+    var cough = tapping ? M.bump(M.seg(u, 0.02, 0.3)) : 0, surge = tapping ? M.ease(M.seg(u, 0.3, 0.46)) * (1 - M.ease(M.seg(u, 0.62, 0.9))) : 0;
+    var shake = (0.45 + 1.6 * cough) * sin(TAU * 8 * t + 6 * u), pitch = 0.028 * M.wave(t, 1) - 0.06 * surge, bob = 1.3 * M.wave(t, 1, 0.12) + 1.3 * surge, lunge = 4 * surge;
+    /* water behind everything that sits on it: deep lines, then the hull, then the surface over its foot */
+    [[80, 0.31], [90, 0.77]].forEach(function (r, j) { p.curve(swell(-5, 155, r[0], 1.1, 24, 2 * t * (j ? -1 : 1) + r[1], 6), { w: 0.4, ink: 'blue', detail: true, alpha: 0.55 }); });
+    p.pivot(78, 72, pitch, 1, function () {
+      p.move(lunge, bob);
+      p.path(HULL, { fill: 'wood' });
+      p.clip(HULL, function () {
+        p.rect(50, 67, 100, 12, { fill: 'navy', line: false });
+        p.path('M50 61.5 L98 61.5 C112 61.5 125 52 140 36', { w: 3.2, ink: 'c', cap: 'round', wob: 0.3 });
+        p.path('M54 65 L104 66.4 C118 64 131 54 141 44', { w: 0.4, detail: true, alpha: 0.8 });
+      });
+      p.path(HULL, {});
+      p.line(58, 58, 98, 58, { w: 0.9 });
+      /* the ribbons stream back from the prow's tip; the farther along, the wider the wave and the later it arrives */
+      ['red', 'pink', 'yellow', 'sky', 'leaf', 'orange'].forEach(function (c, j) {
+        var sp = [], n = 10, q, L = (31 + 6 * ((j * 5) % 6) / 5) * (1 + 0.3 * surge);
+        for (q = 0; q <= n; q++) { var a = q / n; sp.push([140.5 - a * L, 36 + j * 1.5 + (1 + 13 * a * a) * (1 - 0.9 * surge) + (1.2 + 5 * a) * (1 - 0.5 * surge) * sin(TAU * (a * 1.3 - 2 * t + j * 0.09))]); }
+        strap(p, sp, 4.2, 2, { fill: c, w: 0.55 });
+      });
+      p.circle(140.5, 37.5, 2.9, { fill: 'gold', w: 0.8 });
+      /* the garland over the stem: marigolds on a thread, swinging a beat after the boat */
+      var swing = 1.6 * M.wave(t, 2, 0.2) - 2 * surge;
+      for (i = 0; i < 6; i++) {
+        var gv = (i + 0.5) / 6, gx = 143.5 + 4.2 * sin(PI * gv) + swing * gv, gy = 31.5 + 24 * gv;
+        p.circle(gx, gy, 2.7 - 0.3 * gv, { fill: i % 2 ? 'orange' : 'yellow', w: 0.6 });
+      }
+      p.path('M144 31 C150 40 148 50 142 56', { w: 0.4, detail: true, alpha: 0.6 });
+      /* the engine on the stern: a block with a red cover, a flywheel at its back, a pipe up, the shaft out behind */
+      p.push(); p.move(0, 0.6 * shake);
+      var ex = 38, ey = 50, pr = [10.5, 69.5];
+      p.line(ex, ey, pr[0], pr[1], { w: 2.4, ink: 'grey', cap: 'round', wob: 0.3 });
+      p.line(ex, ey, pr[0], pr[1], { w: 0.5, ink: 'ink', cap: 'round', wob: 0.3 });
+      p.line(45, 59, 51, 59, { w: 2, cap: 'round' });
+      p.rect(40, 42, 20, 16, { fill: 'grey', r: 2.5, w: 1 });
+      p.rect(42, 37.5, 16, 6, { fill: 'red', r: 2, w: 0.8 });
+      p.line(44, 48, 56, 48, { w: 0.4, detail: true }); p.line(44, 52, 56, 52, { w: 0.4, detail: true });
+      p.circle(ex + 1, ey, 5.4, { fill: 'smoke', w: 0.9 });
+      for (k = 0; k < 3; k++) p.at(ex + 1, ey, TAU * 3 * t + k * TAU / 3, 1, function () { p.line(0, 0, 0, -4.2, { w: 0.4, detail: true }); });
+      p.dot(ex + 1, ey, 1.3, 'ink');
+      p.path('M56 38 L56 28 C56 25 59 24 61 25', { w: 1.5, ink: 'ink', cap: 'round' });
+      p.rect(58, 50, 5, 6, { fill: 'flame', w: 0.6, r: 1 });
+      p.pop();
+      /* black smoke from the pipe: it coughs */
+      for (k = 0; k < 2; k++) {
+        var cu = tapping ? M.seg(u, 0.03 + k * 0.1, 0.5 + k * 0.1) : -1;
+        if (cu > 0 && cu < 1) { var cr = (3 + 6 * M.easeOut(cu)) * (1 - M.easeIn(M.seg(cu, 0.6, 1))), cxp = 61 - 20 * cu - 4 * k, cyp = 25 - 18 * cu; p.blob(cxp, cyp, cr, { fill: 'grey', lumpy: 0.25, seed: 4 + k, w: 0.8 }); p.blob(cxp - cr * 0.7, cyp + cr * 0.3, cr * 0.7, { fill: 'smoke', lumpy: 0.25, seed: 7 + k, w: 0.7 }); p.blob(cxp + cr * 0.6, cyp - cr * 0.5, cr * 0.6, { fill: 'smoke', lumpy: 0.25, seed: 9 + k, w: 0.7 }); }
+      }
+      /* the propeller under the water, a blur, with the spray thrown up and back off it */
+      p.ellipse(pr[0], pr[1] + 3, 3.6, 7.5, { fill: 'grey', line: false, alpha: 0.3 });
+      p.ellipse(pr[0], pr[1] + 3, 1.7, 6.2 + 1.4 * M.wave(t, 6), { fill: 'grey', w: 0.6 });
+    });
+    /* the surface, over the foot of the hull; the swell slides back as the boat goes */
+    var top = swell(-5, 155, 70.5, 1.7, 26, 2 * t, 5), poly = top.concat([[155, 100], [-5, 100]]);
+    p.poly(poly, { fill: 'sky', line: false, alpha: 0.62 });
+    p.curve(top, { w: 0.9, ink: 'blue' });
+    p.curve(swell(-5, 155, 76, 1.3, 20, 3 * t + 0.4, 5), { w: 0.4, ink: 'blue', detail: true, alpha: 0.6 });
+    /* the wake: foam dashes running back from the stern, more of them in the surge */
+    for (i = 0; i < 4 + (surge > 0.2 ? 2 : 0); i++) {
+      ph = M.frac(t * 1 + i / 4); var len = (7 + 8 * surge) * M.bump(ph), x = 46 - 34 * ph - i * 2, y = 72.5 + (i % 3) * 3.2 + 3 * ph;
+      if (len > 0.8) p.line(x, y, x - len, y, { w: 0.9, ink: 'white', cap: 'round' });
+    }
+    /* the spray: drops thrown up and back from the propeller, each rising, turning and falling */
+    var nd = 6 + Math.round(4 * surge);
+    for (i = 0; i < nd; i++) {
+      ph = M.frac(t * 2 + i / nd); var dxp = -16 * ph * (1 + 0.6 * surge), dyp = -(26 + 12 * surge) * 4 * ph * (1 - ph) * (0.6 + 0.4 * ((i * 5) % 3) / 2), rr = (1.5 + 0.7 * ((i * 7) % 3) / 2) * (1 - 0.5 * ph);
+      p.circle(12 + dxp + bob * 0 + lunge * 0.3, 67 + dyp + dyp * 0, rr, { fill: i % 2 ? 'white' : 'sky', w: 0.5 });
+    }
+    /* the bow wave: a curl of white that swells at the stem */
+    p.blob(137 + lunge, 70.5, 2.6 + 0.9 * M.wave(t, 2) + 1.4 * surge, { fill: 'white', lumpy: 0.2, seed: 3, w: 0.6 });
+    p.blob(142 + lunge, 71.5, 1.8 + 0.6 * M.wave(t, 2, 0.3) + 0.8 * surge, { fill: 'white', lumpy: 0.2, seed: 5, w: 0.5 });
+  }
+});
+
+/* ---------------------------------------------------------------- win-moto */
+/* the motorbike-taxi rider's vest, hung on a hanger: orange, the rider's number on the back, the stand's name above it as a few dashes.
+   Hangs and sways, the hem a little behind the shoulders. */
+function vestPath(front, hem) {
+  var neck = front ? 'L43 29 L50 50 L57 29' : 'L43 29 C46 34 54 34 57 29';
+  return 'M30 30 ' + neck + ' L70 30 C70 38 66 46 64 52 C67 64 71 76 72 ' + (87 + hem) + ' C60 ' + (91 + hem * 1.4) + ' 40 ' + (91 - hem * 1.4) + ' 28 ' + (87 - hem) + ' C29 76 33 64 36 52 C34 46 30 38 30 30 Z';
+}
+D.add('win-moto', {
+  fam: 'daily', tapRest: 0.5, tags: ['win', 'motorbike taxi', 'moto taxi', 'motorcycle taxi', 'vest', 'rider', 'driver', 'orange', 'transport', 'ride', 'วินมอเตอร์ไซค์', 'วิน', 'เสื้อวิน', 'มอเตอร์ไซค์รับจ้าง'], loop: 2.4, still: 0.2, tapLen: 1.8, burst: false,
+  margin: [10, 18, 8, 18], about: 'the orange numbered vest swings on its hanger, the hem a beat behind the shoulders', tapAbout: 'the hanger spins the vest right round: the front shows its pocket number and ID card, then it spins back to the number',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, a = 0, sway = 0.07 * M.wave(t, 1) + 0.015 * M.wave(t, 3, 0.2), hem = 2.2 * M.wave(t, 1, -0.12), i;
+    if (tapping) a = PI * M.ease(M.seg(u, 0.04, 0.36)) + PI * M.ease(M.seg(u, 0.62, 0.94));
+    var sx = cos(a), front = sx < 0;
+    p.pivot(53, 9, sway * (1 - 0.8 * (tapping ? M.bump(M.seg(u, 0, 1)) : 0)), 1, function () {
+      p.pivot(50, 50, 0, [Math.max(0.03, Math.abs(sx)), 1], function () {
+        p.path('M50 15 L26 33 L74 33 Z', { w: 0.9, fill: 'wood' });
+        p.path('M50 15 L50 10 C50 3.5 58 4 57 10', { w: 1.3, cap: 'round' });
+        p.pivot(50, 26, 0.035 * M.wave(t, 1, -0.1), 1, function () {
+          p.path(vestPath(front, hem), { fill: 'orange', w: 1.05 });
+          p.clip(vestPath(front, hem), function () {
+            p.line(20, 83 + hem, 80, 83 - hem, { w: 2.6, ink: 'cream', alpha: 0.9, cap: 'round' });
+            if (!front) p.path('M30 30 L43 29 C46 34 54 34 57 29 L70 30 L70 36 L30 36 Z', { fill: 'a', line: false, alpha: 0.5, detail: true });
+            for (i = 0; i < 3; i++) p.path('M' + (26 + i * 2) + ' ' + (36 + i * 4) + ' C' + (31 + i) + ' ' + (60 + i * 5) + ' ' + (28 + i) + ' 72 ' + (27 + i) + ' 82', { w: 0.35, detail: true, alpha: 0.35 });
+          });
+          p.path(vestPath(front, hem), { w: 1.05 });
+          if (!front) {
+            p.path('M43 29 C46 34 54 34 57 29', { w: 1.1 });
+            p.line(41, 39.5, 47, 39.5, { w: 1.3, ink: 'night', cap: 'round' }); p.line(50, 39.5, 53, 39.5, { w: 1.3, ink: 'night', cap: 'round' }); p.line(56, 39.5, 61, 39.5, { w: 1.3, ink: 'night', cap: 'round' });
+            p.rect(34, 44, 32, 37, { fill: 'cream', r: 4, w: 0.9 });
+            if (p.small) { p.rect(39, 51, 7, 22, { fill: 'night', line: false }); p.rect(54, 51, 7, 22, { fill: 'night', line: false }); } else num(p, '27', 36.2, 51, 22, 1.9, 'night');
+          } else {
+            p.path('M43 29 L50 50 L57 29', { w: 1.1 });
+            p.line(50, 50, 50 + 0.4 * hem, 88 + hem * 0.6, { w: 0.7 });
+            for (i = 0; i < 4; i++) p.dot(50, 57 + i * 8, 1.2, 'night');
+            p.rect(32.5, 55, 14, 12, { fill: 'cream', r: 1.5, w: 0.8 });
+            num(p, '27', 35, 57.5, 7.5, 0.8, 'night');
+            p.path('M45 30 L50 41 L55 30', { w: 0.4, ink: 'night', detail: true });
+            p.rect(53.5, 42, 10, 13, { fill: 'white', r: 1.5, w: 0.8 });
+            p.circle(58.5, 47, 2.3, { fill: 'skin', w: 0.5, detail: true }); p.line(55.5, 52, 61.5, 52, { w: 0.5, detail: true });
+          }
+        });
+      });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- helmet */
+/* an open-face motorbike helmet in profile, facing right: a dome with a short peak, ear flaps, a clear shield on screws at the temple, a chin strap with its buckle */
+var SHELL = 'M12 66 C8 38 28 14 54 14 C78 14 93 30 95 53 L95 57 C85 58 76 60 70 64 C67 70 66 76 62 79 C58 81 53 80 51 76 C48 70 40 68 30 69 L14 70 C13 69 12.5 67.5 12 66 Z';
+D.add('helmet', {
+  fam: 'daily', tapRest: 0.4, tags: ['helmet', 'motorbike', 'motorcycle', 'scooter', 'safety', 'visor', 'ride', 'rental', 'head', 'หมวกกันน็อค', 'หมวกกันน็อก', 'หมวก'], loop: 2.2, still: 0.1, tapLen: 1.5, burst: 'spark', burstAt: [84, 36], burstN: 4, burstSpread: 1.2, burstDelay: 0.7,
+  margin: [24, 12, 22, 10], about: 'the helmet rocks a little on its dome, the strap swinging after it and a glint crossing the shell', tapAbout: 'the shield flips up on its screws with a click, stays a moment, and snaps down again',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, up = tapping ? M.spring(M.seg(u, 0.04, 0.34)) * (1 - M.ease(M.seg(u, 0.56, 0.7))) : 0, rock = 0.05 * M.wave(t, 1), lag = 0.3 * M.wave(t, 1, -0.2) - 0.25 * rock, gl = M.frac(t * 1);
+    p.ellipse(52, 91, 34, 4, { fill: 'smoke', line: false });
+    p.pivot(50, 84, rock + (tapping ? 0.04 * M.bump(M.seg(u, 0.04, 0.3)) : 0), 1, function () {
+      /* the strap, hanging from under the ear flap */
+      p.pivot(58, 79, lag, 1, function () {
+        p.path('M54.5 79 C54 84 54 88 55 93', { w: 1.9, ink: 'night', cap: 'round' }); p.path('M62 79 C62.5 84 63.5 88 63 93', { w: 1.9, ink: 'night', cap: 'round' });
+        p.rect(52.5, 92, 12, 6, { fill: 'stone', r: 1.5, w: 0.9 }); p.line(55, 95, 62, 95, { w: 0.5, detail: true });
+      });
+      p.path(SHELL, { fill: 'red' });
+      p.clip(SHELL, function () {
+        p.path('M5 44 C26 32 70 36 100 52', { w: 4.6, ink: 'white', cap: 'round', alpha: 0.95, line: true });
+        p.path('M40 8 C62 8 90 22 100 44 L100 8 Z', { fill: 'white', line: false, alpha: 0.12, detail: true });
+        var gu = M.seg(gl, 0.1, 0.6), x = M.lerp(-12, 112, M.ease(gu));
+        if (gu > 0 && gu < 1) {
+          p.poly([[x, 6], [x + 7, 6], [x - 6, 72], [x - 13, 72]], { fill: 'white', line: false, alpha: 0.5 });
+          p.poly([[x + 11, 6], [x + 14, 6], [x + 1, 72], [x - 2, 72]], { fill: 'white', line: false, alpha: 0.4 });
+        }
+      });
+      p.path(SHELL, {});
+      p.path('M95 57 C85 58 76 60 70 64 C67 70 66 76 62 79 C58 81 53 80 51 76 C48 70 40 68 30 69 L14 70', { w: 2.4, ink: 'night', cap: 'round', wob: 0.4 });
+      p.path('M70 62 C60 62 56 66 54 72', { w: 0.45, detail: true });
+      /* the screw, and the shield on it */
+      p.pivot(78, 40, -2.2 * up, [1 - 0.08 * up, 1 - 0.08 * up], function () {
+        p.path('M78 38 C96 36 107 48 106 62 C105 75 97 84 86 85 C80 80 73 72 70 65 L80 59 C84 52 82 44 78 38 Z', { fill: 'sky', alpha: 0.42, w: 0.95 });
+        p.path('M96 46 C102 52 103 62 99 72', { w: 0.7, ink: 'white', alpha: 0.95, detail: true });
+        p.path('M92 44 C94 45 96 46 97 48', { w: 0.7, ink: 'white', alpha: 0.95, detail: true });
+        p.path('M106 62 C105 75 97 84 86 85', { w: 2, ink: 'night', cap: 'round', wob: 0.3 });
+      });
+      p.circle(78, 40, 2, { fill: 'stone', w: 0.8 });
+      if (tapping) { var k = M.bump(M.seg(u, 0.03, 0.2)); if (k > 0.05) { for (var i = 0; i < 3; i++) p.line(80 + 4 * cos(-0.6 + i * 0.7) * 1.1, 40 + 4 * sin(-0.6 + i * 0.7) * 1.1, 80 + (4 + 5 * k) * cos(-0.6 + i * 0.7), 40 + (4 + 5 * k) * sin(-0.6 + i * 0.7), { w: 0.6, ink: 'a', cap: 'round' }); } }
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- dust-mask */
+/* a pleated mask (worn through the burning season, PM2.5) with its ear loops, haze drifting past: what comes straight at it is stopped */
+var MASK = 'M23 41 C23 38.5 25 37 28 37 L72 37 C75 37 77 38.5 77 41 L77 62 C77 71 69 77 59 77 L41 77 C31 77 23 71 23 62 Z';
+D.add('dust-mask', {
+  fam: 'daily', tapRest: 0.45, tags: ['mask', 'dust mask', 'face mask', 'n95', 'pm2.5', 'haze', 'smoke', 'burning season', 'air quality', 'pollution', 'health', 'breathe', 'หน้ากาก', 'หน้ากากอนามัย', 'ฝุ่น', 'pm 2.5', 'หมอกควัน'], loop: 3.6, still: 0.2, tapLen: 2, burst: 'bubble', burstAt: [88, 58], burstN: 5, burstSpread: 1.3, burstDelay: 0.35, burstColor: 'mint', burstGravity: -30,
+  margin: [14, 16, 14, 16], about: 'the mask breathes in and out while smoke specks drift across; the ones that come straight at it are stopped on its face', tapAbout: 'a thick wave of haze rushes in and every speck pops against the mask; clean air breathes out of the far side',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, ph, k, br = 0.035 * M.wave(t, 1), hit = 0, rock = 0;
+    if (tapping) { hit = M.bump(M.seg(u, 0.18, 0.5)); br += 0.05 * M.bump(M.seg(u, 0.3, 0.7)); rock = 0.035 * sin(TAU * 4 * M.seg(u, 0.2, 0.6)) * M.bump(M.seg(u, 0.2, 0.6)); }
+    /* a haze that never quite clears: faint bands sliding across */
+    for (i = 0; i < 3; i++) p.curve(swell(-6, 106, 12 + i * 40, 2.2, 30, t * (i % 2 ? -1 : 1) + i * 0.3, 8), { w: 0.5, ink: 'stone', alpha: 0.8, detail: true });
+    /* specks that sail past above and below the mask, and ones that run into it and stop */
+    [[16, 1, 0.1, 3.2], [88, 1, 0.45, 2.6], [10, 2, 0.7, 1.8], [92, 2, 0.2, 2.8], [26, 1, 0.83, 2.2], [84, 1, 0.31, 3.4]].forEach(function (c, j) {
+      var x = -8 + 116 * M.frac(t * c[1] + c[2]), y = c[0] + 3 * sin(TAU * (t * 2 + c[2] * 3));
+      p.blob(x, y, c[3], { fill: 'smoke', lumpy: 0.3, seed: j + 3, w: 0.55, detail: j > 2 });
+    });
+    [[40, 0.0], [48, 0.34], [57, 0.62], [66, 0.18], [73, 0.5], [44, 0.78], [61, 0.9]].forEach(function (c, j) {
+      ph = M.frac(t * (j % 2 ? 1 : 2) + c[1] + 0.001); var x = -8 + 30 * ph, r = (2 + (j % 3) * 0.6) * (1 - M.easeIn(M.seg(ph, 0.8, 1))), sq = 1 + 0.9 * M.seg(ph, 0.7, 1);
+      if (r > 0.3) p.at(x, c[0] + 2 * sin(TAU * (ph * 2 + j * 0.2)), 0, [1 / sq, sq], function () { p.blob(0, 0, r, { fill: 'smoke', lumpy: 0.3, seed: j + 1, w: 0.55 }); });
+    });
+    if (tapping) for (i = 0; i < 12; i++) {
+      var a0 = 0.02 * i, a1 = 0.34 + 0.02 * i, mu = M.seg(u, a0, a1), ly = 40 + (i * 37) % 34, x2 = -10 + 32 * M.easeOut(mu);
+      if (mu > 0 && mu < 1) p.blob(x2, ly + 3 * sin(TAU * mu * 2 + i), 2.6 * (1 - M.easeIn(M.seg(mu, 0.8, 1))), { fill: 'smoke', lumpy: 0.3, seed: i + 2, w: 0.55 });
+      var pu = M.seg(u, a1, a1 + 0.12);
+      if (pu > 0 && pu < 1) for (k = 0; k < 3; k++) { var an = -0.9 + k * 0.9 + i * 0.4, r0 = 2 + 2 * pu, r1 = 3.5 + 6 * M.easeOut(pu); p.line(21 + r0 * cos(an) * 0.6, ly + r0 * sin(an), 21 + r1 * cos(an) * 0.6, ly + r1 * sin(an), { w: 0.6, ink: 'grey', cap: 'round' }); }
+    }
+    /* the mask, its loops lagging the breath */
+    var lag = 0.035 * M.wave(t, 1, -0.1);
+    p.pivot(50, 58, rock, [1 + br * 0.6 - 0.012 * hit, 1 + br + 0.01 * hit], function () {
+      [-1, 1].forEach(function (sd) {
+        var sp = 1 + lag * 6 * sd;
+        p.path('M' + (50 + sd * 27) + ' 45 C' + (50 + sd * (40 * sp)) + ' 36 ' + (50 + sd * (49 + 2 * lag * 20)) + ' 50 ' + (50 + sd * 46) + ' 59 C' + (50 + sd * 44) + ' 69 ' + (50 + sd * 34) + ' 69 ' + (50 + sd * 25) + ' 65', { w: 1.2, ink: 'grey', cap: 'round', wob: 0.4 });
+      });
+      p.path(MASK, { fill: 'c' });
+      p.clip(MASK, function () {
+        [49, 58.5, 68].forEach(function (y, j) {
+          p.path('M20 ' + y + ' C38 ' + (y + 4) + ' 62 ' + (y + 4) + ' 80 ' + y, { w: 0.8, ink: 'night', alpha: 0.55 });
+          p.path('M20 ' + (y + 1.8) + ' C38 ' + (y + 5.8) + ' 62 ' + (y + 5.8) + ' 80 ' + (y + 1.8), { w: 0.8, ink: 'white', alpha: 0.65 });
+        });
+        p.poly([[23, 37], [77, 37], [77, 40], [23, 40]], { fill: 'white', line: false, alpha: 0.35 });
+      });
+      p.path(MASK, {});
+      p.path('M37 38.4 C44 36.4 56 36.4 63 38.4', { w: 1.8, ink: 'grey', cap: 'round', wob: 0.3 });
+    });
+    /* what comes out the far side is clean: two slow arcs, drawn then let go */
+    [0, 1].forEach(function (j) {
+      var d = 'M' + (84 + j * 6) + ' 48 C' + (90 + j * 6) + ' 52 ' + (90 + j * 6) + ' 62 ' + (84 + j * 6) + ' 66';
+      p.span(d, M.easeIn(M.seg(M.frac(t + j * 0.18), 0.55, 1)), M.easeOut(M.seg(M.frac(t + j * 0.18), 0.05, 0.55)), { w: 0.9, ink: 'leaf', cap: 'round', detail: true });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- sim-card */
+/* a nano SIM with its cut corner and gold chip; signal arcs are sent out of the cut corner one after another */
+var SIMB = 'M-18 -30 L8 -30 L22 -16 L22 26 C22 28.5 20.5 30 18 30 L-18 30 C-20.5 30 -22 28.5 -22 26 L-22 -26 C-22 -28.5 -20.5 -30 -18 -30 Z';
+D.add('sim-card', {
+  fam: 'daily', tapRest: 0.7, tags: ['sim', 'sim card', 'travel sim', 'mobile', 'phone', 'data', 'signal', 'roaming', 'esim', 'network', 'internet', 'ซิม', 'ซิมการ์ด', 'สัญญาณ'], loop: 2.2, still: 0.2, tapLen: 1.8, burst: 'star', burstAt: [40, 58], burstN: 4, burstSpread: 1, burstDelay: 0.22, burstColor: 'gold',
+  margin: [14, 10, 12, 10], about: 'the SIM floats and tilts, three signal arcs drawn out of its cut corner one after another, a glint crossing the chip', tapAbout: 'the card clicks down, the chip lights up and four signal bars climb to full one by one',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, press = tapping ? M.bump(M.seg(u, 0.04, 0.26)) : 0, lit = tapping ? M.ease(M.seg(u, 0.14, 0.28)) * (1 - M.ease(M.seg(u, 0.8, 0.95))) : 0;
+    var bob = 2.2 * M.wave(t, 1), tilt = 0.1 + 0.05 * M.wave(t, 1, 0.2), arcs = tapping ? 1 - M.ease(M.seg(u, 0.05, 0.25)) : 1, gu = M.seg(t, 0.15, 0.6);
+    /* the signal: arcs from the cut corner, each drawn out, held, then taken back; four bars in a tap */
+    for (i = 0; i < 3; i++) {
+      var r = 11 + i * 9.5, d = 'M' + (62 + r * cos(-1.35)) + ' ' + (27 + r * sin(-1.35)) + ' A' + r + ' ' + r + ' 0 0 1 ' + (62 + r * cos(-0.2)) + ' ' + (27 + r * sin(-0.2));
+      var hd = M.easeOut(M.seg(t, 0.05 + i * 0.12, 0.36 + i * 0.12)), tl = M.easeIn(M.seg(t, 0.62 + i * 0.07, 0.96));
+      if (arcs > 0.02) p.span(d, tl, hd * arcs, { w: 1.5 + (2 - i) * 0.1, ink: 'c', cap: 'round' });
+    }
+    if (tapping) for (i = 0; i < 4; i++) {
+      var g = M.spring(M.seg(u, 0.24 + i * 0.09, 0.42 + i * 0.09)) * (1 - M.ease(M.seg(u, 0.8 + i * 0.03, 0.95 + i * 0.01))), hh = (7 + i * 6.5) * Math.max(0, g);
+      if (hh > 0.4) p.rect(68 + i * 7, 82 - hh, 5, hh, { fill: 'leaf', r: 1.2, w: 0.9 });
+    }
+    p.at(40, 58 + bob + 2.5 * press, tilt - 0.06 * press, [1 + 0.03 * press, 1 - 0.05 * press], function () {
+      p.path(SIMB, { fill: 'blue' });
+      p.line(-16, -24, 0, -24, { w: 1.2, ink: 'white', cap: 'round', detail: true }); p.line(-16, -19, -6, -19, { w: 0.8, ink: 'white', cap: 'round', detail: true });
+      p.circle(13, -17.5, 2.6, { fill: 'gold', w: 0.5, detail: true });
+      p.rect(-14, -7, 28, 28, { fill: 'gold', r: 5, w: 1, glow: lit * 0.9 });
+      p.clip(function () { p.rect(-14, -7, 28, 28, { r: 5 }); }, function () {
+        if (gu > 0 && gu < 1) { var x = M.lerp(-30, 24, M.ease(gu)); p.poly([[x, -9], [x + 6, -9], [x - 6, 24], [x - 12, 24]], { fill: 'white', line: false, alpha: 0.6 }); }
+        if (lit > 0.02) p.rect(-14, -7, 28, 28, { fill: 'yellow', line: false, alpha: 0.8 * lit });
+      });
+      p.rect(-6.5, 0, 13, 16, { r: 3.5, w: 0.7 });
+      p.line(-14, 5, -6.5, 5, { w: 0.6 }); p.line(6.5, 5, 14, 5, { w: 0.6 }); p.line(-14, 12, -6.5, 12, { w: 0.6 }); p.line(6.5, 12, 14, 12, { w: 0.6 });
+      p.line(0, -7, 0, 0, { w: 0.6 }); p.line(0, 16, 0, 21, { w: 0.6 });
+      p.path(SIMB, {});
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- mosquito */
+/* points along a cubic, for the spines of things that bend */
+function bez(a, b, c, d, n) {
+  var o = [], i, u, v;
+  for (i = 0; i <= n; i++) { u = i / n; v = 1 - u; o.push([v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]); }
+  return o;
+}
+/* a jointed leg: base (x, y), three bones whose headings a1..a3 are clockwise from straight down */
+function leg(p, x, y, a, L, o) {
+  var pts = [[x, y]], i, h;
+  for (i = 0; i < 3; i++) { h = pts[i]; pts.push([h[0] + L[i] * sin(a[i]), h[1] + L[i] * cos(a[i])]); }
+  p.path('M' + pts.map(function (q) { return q[0].toFixed(2) + ' ' + q[1].toFixed(2); }).join(' L'), o);
+  p.dot(pts[1][0], pts[1][1], 0.8, 'ink'); p.dot(pts[2][0], pts[2][1], 0.7, 'ink');
+}
+/* the mosquito itself, facing left, drawn about the middle of its thorax; fl is the wing's phase, dz the leg dangle and tuck */
+function mosq(p, t, fl, tuck, daze) {
+  var i, wa = -0.85 + 0.5 * sin(TAU * fl), wb = -0.7 + 0.5 * sin(TAU * fl + 0.5), sp = bez([7, 2], [17, 1], [29, 6], [41, 14], 8);
+  /* the far wing and legs, behind the body */
+  p.arc(3, -7, 26, -1.45, -0.25, { pie: true, fill: 'sky', alpha: 0.2, line: false, ink: 'sky' });
+  p.at(3, -7, wb - 0.1, 1, function () { p.path('M0 0 C6 -4 18 -5 25 -1.4 C20 3 8 4 0 0 Z', { fill: 'sky', alpha: 0.3, w: 0.4 }); });
+  leg(p, 2, 6, [0.9 + 0.15 * tuck, 0.5 + 0.1 * sin(TAU * (t + 0.2)), 0.2], [10, 11, 7], { w: 0.8, cap: 'round' });
+  leg(p, -3, 6, [-0.35 - 0.3 * tuck, 0.05 + 0.12 * sin(TAU * (t + 0.1)), -0.2], [10, 12, 6], { w: 0.8, cap: 'round' });
+  /* the abdomen, banded */
+  strap(p, sp, 10, 4.2, { fill: 'brown', w: 0.9 });
+  [2, 4, 6].forEach(function (k) { var q = sp[k], r = sp[k + 1], h = 3.6 - 0.35 * k, ang = Math.atan2(r[1] - sp[k - 1][1], r[0] - sp[k - 1][0]); p.line(q[0] - sin(ang) * h, q[1] + cos(ang) * h, q[0] + sin(ang) * h, q[1] - cos(ang) * h, { w: 1.5, ink: 'white', cap: 'round', detail: true }); });
+  /* thorax and head */
+  p.ellipse(0, 0, 10.5, 8.6, { fill: 'brown', w: 1 });
+  p.path('M-6 -5 C-2 -8 3 -8 7 -5', { w: 0.5, ink: 'white', detail: true }); p.line(-1, -7, -1, 4, { w: 0.9, ink: 'white', alpha: 0.9, detail: true });
+  p.circle(-14.5, 3.5, 5.2, { fill: 'brown', w: 0.95 });
+  p.circle(-16.5, 2, 2.1, { fill: 'red', w: 0.5 }); p.dot(-17, 1.6, 0.8, 'ink');
+  p.line(-18.4, 6.4, -34, 21, { w: 1.3, ink: 'ink', cap: 'taper' });
+  p.path('M-17 -0.8 C-21 -7 -26 -9 -31 -8', { w: 0.6 }); p.path('M-14.5 -1.4 C-17 -9 -22 -12 -27 -12', { w: 0.6, detail: true });
+  /* the near legs */
+  leg(p, -7, 6.5, [-1.2 - 0.2 * tuck, 0.1 + 0.14 * sin(TAU * t), 0.3], [10, 11, 7], { w: 0.8, cap: 'round' });
+  leg(p, -1, 7.5, [-0.45 - 0.2 * tuck, -0.1 + 0.12 * sin(TAU * (t + 0.15)), 0.05], [11, 13, 7], { w: 0.8, cap: 'round' });
+  leg(p, 5, 7, [0.55 + 0.2 * tuck, 0.3 + 0.12 * sin(TAU * (t + 0.3)), 0.25], [10, 12, 8], { w: 0.8, cap: 'round' });
+  /* the near wing: a fan of its beat, and one crisp wing on top */
+  p.arc(3, -7, 29, wa - 0.5, wa + 0.5, { pie: true, fill: 'sky', alpha: 0.3, line: false, ink: 'sky' });
+  p.at(3, -7, wa, 1, function () { p.path('M0 0 C7 -5 22 -6.5 30 -1.5 C24 3.5 9 4.5 0 0 Z', { fill: 'sky', alpha: 0.5, w: 0.6 }); p.line(3, -0.4, 26, -1.6, { w: 0.4, detail: true }); });
+}
+/* a fly swatter, handle up, its head at the origin */
+function swatter(p) {
+  p.line(0, -17, 0, -62, { w: 4.4, ink: 'wood', cap: 'round' }); p.line(0, -17, 0, -62, { w: 0.5, cap: 'round' });
+  p.rect(-14, -17, 28, 34, { fill: 'white', alpha: 0.45, r: 6, line: false });
+  for (var i = -2; i <= 2; i++) { p.line(i * 5, -15, i * 5, 15, { w: 0.35, detail: true }); }
+  for (i = -3; i <= 3; i++) { p.line(-12, i * 4.6, 12, i * 4.6, { w: 0.35, detail: true }); }
+  p.rect(-14, -17, 28, 34, { r: 6, ink: 'red', w: 2 });
+  p.rect(-3, -22, 6, 8, { fill: 'red', r: 2, w: 0.8 });
+}
+D.add('mosquito', {
+  fam: 'daily', tapRest: 0.4, tags: ['mosquito', 'dengue', 'bite', 'insect', 'bug', 'rainy season', 'malaria', 'repellent', 'fly', 'ยุง', 'ไข้เลือดออก', 'ยุงลาย'], loop: 1.5, still: 0.3, tapLen: 2.6, burst: false, tapMargin: [50, 60, 24, 70],
+  margin: [20, 22, 26, 34], about: 'hovers in a wobbling figure of eight, wings a blur, the legs dangling a beat behind', tapAbout: 'a swatter slams down and flattens it; it peels itself up, dizzy with stars, and staggers off out of sight; a new one drifts back in',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, hx = 3.2 * M.wave(t, 1), hy = 3.2 * M.wave(t, 2, 0.1), rot = 0.06 * M.wave(t, 2, 0.35), fl = 14 * t, ox = 0, oy = 0, sc = 1, sq = 1, daze = 0, sw = -1, i;
+    if (tapping) {
+      var hold = M.seg(u, 0.16, 0.3) * (1 - M.seg(u, 0.3, 0.4));
+      sq = 1 - 0.78 * (u >= 0.15 && u < 0.4 ? M.ease(M.seg(u, 0.15, 0.17)) * (1 - M.ease(M.seg(u, 0.33, 0.45))) : 0);
+      daze = M.ease(M.seg(u, 0.4, 0.5)) * (1 - M.ease(M.seg(u, 0.74, 0.8)));
+      /* it leaves along a lurching line, shrinking, and a new one comes in from the left */
+      var go = M.seg(u, 0.5, 0.8), back = M.seg(u, 0.86, 1);
+      if (u >= 0.5 && u < 0.86) { ox = 70 * M.easeIn(go) + 5 * sin(TAU * go * 2.5); oy = -34 * M.easeIn(go) + 7 * sin(TAU * go * 3.5); sc = 1 - 0.8 * M.easeIn(go); rot = 0.35 * sin(TAU * go * 3) + 0.5 * go; }
+      if (u >= 0.86) { ox = -70 * (1 - M.easeOut(back)); oy = -8 * (1 - M.easeOut(back)); sc = 0.4 + 0.6 * M.easeOut(back); }
+      if (u >= 0.4 && u < 0.5) rot = 0.3 * sin(TAU * 3 * M.seg(u, 0.4, 0.5)) * M.bump(M.seg(u, 0.4, 0.5)) * 2;
+      if (u >= 0.15 && u < 0.4) rot = 0;
+      sw = u;
+    }
+    var cx = 52 + hx * (tapping && u > 0.1 && u < 0.5 ? 0.2 : 1) + ox, cy = 46 + hy * (tapping && u > 0.1 && u < 0.5 ? 0.2 : 1) + oy + (sq < 1 ? 10 * (1 - sq) * 0.3 : 0);
+    if (sc > 0.05) p.at(cx, cy, rot, [sc, sc * sq], function () { mosq(p, t, fl, sq < 1 ? 1 : 0, daze); });
+    if (tapping) {
+      /* the swatter comes down fast, stays, and lifts away */
+      var down = M.easeIn(M.seg(u, 0.06, 0.15)), lift = M.ease(M.seg(u, 0.3, 0.46));
+      var sy = M.lerp(-84, 46 - 4, down) - 96 * lift, sx = 52;
+      if (u > 0.05 && u < 0.5) p.at(sx + 4, sy, 0.1 * (1 - down) - 0.04, 1, function () { swatter(p); });
+      /* the hit: lines thrown out from where it lands, then taken back */
+      var hu = M.seg(u, 0.15, 0.34);
+      if (hu > 0 && hu < 1) for (i = 0; i < 7; i++) { var an = -2.9 + i * 0.42, r0 = 18 + 4 * hu, r1 = 22 + 12 * M.easeOut(hu); p.span('M' + (52 + r0 * cos(an) * 1.2) + ' ' + (56 + r0 * sin(an) * 0.7) + ' L' + (52 + r1 * cos(an) * 1.2) + ' ' + (56 + r1 * sin(an) * 0.7), M.easeIn(M.seg(hu, 0.4, 1)), M.easeOut(M.seg(hu, 0, 0.5)), { w: 0.8, cap: 'round' }); }
+      /* dizzy: stars orbiting where its head is */
+      if (daze > 0.02) for (i = 0; i < 3; i++) { var oa = TAU * (u * 3 + i / 3); p.star(cx - 14 + 11 * cos(oa), cy - 6 + 4 * sin(oa) - 7, 3 * daze * sc, 1.3 * daze * sc, 4, { fill: 'yellow', w: 0.5 }); }
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- alms-bowl */
+/* บาตร: a monk's alms bowl on its stand, heaped with sticky rice and a lotus laid on top, steam rising; its lid sits beside it */
+var BOWL = 'M8 54 C8 66 22 76 38 76 C54 76 68 66 68 54 C68 62 8 62 8 54 Z';
+function lid(p, k) { /* the lid about the middle of its rim, dome up, a knob on top */
+  p.at(0, 0, 0, k, function () {
+    p.path('M-15 0 C-15 -11 -8 -16 0 -16 C8 -16 15 -11 15 0 C15 4.5 -15 4.5 -15 0 Z', { fill: 'night' });
+    p.path('M-10 -9 C-8 -12 -5 -13.5 -2 -14', { w: 0.7, ink: 'white', detail: true, alpha: 0.8 });
+    p.path('M-15 0 C-15 4.5 15 4.5 15 0', { w: 1.6, ink: 'gold', cap: 'round' });
+    p.line(0, -16, 0, -19, { w: 1.6, ink: 'gold', cap: 'round' }); p.ellipse(0, -20.5, 3.4, 2.4, { fill: 'gold', w: 0.8 });
+  });
+}
+D.add('alms-bowl', {
+  fam: 'daily', tapRest: 0.6, tags: ['alms bowl', 'bowl', 'sticky rice', 'rice', 'offering', 'merit', 'tak bat', 'temple', 'lotus', 'morning', 'food', 'บาตร', 'ใส่บาตร', 'ข้าวเหนียว', 'ทำบุญ', 'ดอกบัว'], loop: 2.6, still: 0.2, tapLen: 2.4, burst: 'petal', burstAt: [38, 36], burstN: 3, burstSpread: 1.3, burstDelay: 0.76, burstColor: 'pink',
+  margin: [22, 14, 10, 14], about: 'steam curls up from a heap of sticky rice in a black alms bowl, the lotus on top breathing open and closed, the lid waiting beside', tapAbout: 'the lid squats, hops up onto the bowl with a clink and a puff of steam, then hops back off beside it',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, R = p.rng(1), spread = 1 + 0.1 * M.wave(t, 1), lx = 84, ly = 90, lk = 1, lsy = 1, lrot = 0, on = 0, hop = 0;
+    if (tapping) {
+      var a1 = M.seg(u, 0.14, 0.44), a2 = M.seg(u, 0.74, 0.98);
+      var crouch1 = M.bump(M.seg(u, 0.05, 0.16)), crouch2 = M.bump(M.seg(u, 0.66, 0.76)), land = M.bump(M.seg(u, 0.44, 0.54));
+      var pos = M.ease(a1) * (1 - M.ease(a2)); on = u > 0.44 && u < 0.74 ? 1 : 0;
+      lx = M.lerp(84, 38, pos); ly = M.lerp(90, 54, pos); lk = M.lerp(1, 2, pos);
+      hop = (a1 > 0 && a1 < 1 ? 4 * a1 * (1 - a1) : 0) + (a2 > 0 && a2 < 1 ? 4 * a2 * (1 - a2) : 0);
+      ly -= 30 * hop; lsy = 1 - 0.18 * (crouch1 + crouch2 + land);
+      lrot = 0.22 * sin(TAU * a1) * (a1 > 0 && a1 < 1 ? 1 : 0) - 0.22 * sin(TAU * a2) * (a2 > 0 && a2 < 1 ? 1 : 0);
+    }
+    /* the stand: a brass ring on three legs */
+    p.path('M25 75 L22 89 C30 92 46 92 54 89 L51 75 Z', { fill: 'gold', w: 1 });
+    p.ellipse(38, 75, 13, 3, { fill: 'gold', w: 0.8 });
+    [[27.5, 33.5], [42.5, 48.5]].forEach(function (c) { p.path('M' + c[0] + ' 89.4 C' + c[0] + ' 83 ' + c[1] + ' 83 ' + c[1] + ' 90.2', { fill: 'brown', w: 0.7 }); });
+    p.line(26, 80, 50, 80, { w: 0.4, detail: true, ink: 'brown' });
+    /* the bowl: lacquer black, a gold lip */
+    p.ellipse(38, 54, 30, 7, { fill: 'night' });
+    p.path(BOWL, { fill: 'night' });
+    p.path('M13 63 C17 69 23 73 30 75', { w: 0.9, ink: 'white', alpha: 0.7, detail: true });
+    /* the heap of rice, which the rim's front lip then crosses */
+    p.path('M10 53 C11 36 25 27 38 27 C51 27 65 36 66 53 C58 60 18 60 10 53 Z', { fill: 'cream' });
+    p.clip('M10 53 C11 36 25 27 38 27 C51 27 65 36 66 53 C58 60 18 60 10 53 Z', function () {
+      for (i = 0; i < 26; i++) { var gx = 14 + R() * 48, gy = 31 + R() * 26, gr = (R() - 0.5) * 3; p.ellipse(gx, gy, 1.7, 0.85, { rot: gr, fill: 'white', w: 0.32, detail: true }); }
+    });
+    p.path('M10 53 C11 36 25 27 38 27 C51 27 65 36 66 53', { w: 1 });
+    p.arc(38, 54, 29.6, 0, PI, { ry: 6.8, w: 1.1, ink: 'gold', cap: 'round' });
+    /* steam from the rice, one wisp after another, each drawn up and let go */
+    [[28, 0], [38, 0.34], [48, 0.67]].forEach(function (c) {
+      var ph = M.frac(t + c[1]), d = 'M' + c[0] + ' 25 C' + (c[0] + 7) + ' 18 ' + (c[0] - 7) + ' 11 ' + c[0] + ' 2';
+      p.span(d, M.easeIn(M.seg(ph, 0.4, 1)), M.easeOut(M.seg(ph, 0, 0.6)), { w: 0.9, ink: 'grey', cap: 'round', alpha: 0.9 });
+    });
+    /* the lotus laid on the heap: two rings of petals that breathe open a little and close */
+    p.at(40, 33, -0.12, 1, function () {
+      [[-0.95, 'lilac', 12], [0.95, 'lilac', 12], [-0.5, 'pink', 14], [0.5, 'pink', 14], [0, 'rose', 16]].forEach(function (q, j) {
+        p.at(0, 0, q[0] * spread, 1, function () { p.path('M0 1.5 C-5.5 -2 -5.5 -' + (q[2] - 4) + ' 0 -' + q[2] + ' C5.5 -' + (q[2] - 4) + ' 5.5 -2 0 1.5 Z', { fill: q[1], w: 0.75 }); p.line(0, -1, 0, -q[2] + 4, { w: 0.35, detail: true, alpha: 0.6 }); });
+      });
+      p.circle(0, 1.5, 2.1, { fill: 'gold', w: 0.6 });
+    });
+    p.path('M30 37 C23 39 17 41 11 47', { w: 1.1, ink: 'green', cap: 'round', wob: 0.3 });
+    /* the lid: beside the bowl, or hopping on and off it */
+    p.ellipse(lx, 91.5, 13 * lk * (1 - hop * 0.3), 2.2, { fill: 'smoke', line: false, alpha: tapping ? 0.8 : 1, detail: true });
+    p.at(lx, ly, lrot, [1, lsy], function () { lid(p, lk); });
+    if (tapping && u > 0.44 && u < 0.76) {
+      var cu = M.seg(u, 0.44, 0.76);
+      [-1, 1].forEach(function (sd) {
+        for (i = 0; i < 3; i++) { var an = -0.35 - 0.35 * i, r0 = 31 + 1.5 * cu, r1 = 34 + 5 * M.bump(M.seg(cu, 0, 0.5)); if (M.bump(M.seg(cu, 0, 0.5)) > 0.05) p.line(38 + sd * r0 * cos(an), 55 + r0 * sin(an) * 0.8, 38 + sd * r1 * cos(an), 55 + r1 * sin(an) * 0.8, { w: 0.8, ink: 'a', cap: 'round' }); }
+        var pu = M.seg(cu, 0.15, 0.9); if (pu > 0 && pu < 1) p.blob(38 + sd * (31 + 6 * pu), 53 - 6 * pu, 3.4 * M.bump(pu) + 0.4, { fill: 'white', lumpy: 0.2, seed: 5 + sd, w: 0.6 });
+      });
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- mongkol */
+function oval(cx, cy, rx, ry) { return 'M' + (cx - rx) + ' ' + cy + ' A' + rx + ' ' + ry + ' 0 1 1 ' + (cx + rx) + ' ' + cy + ' A' + rx + ' ' + ry + ' 0 1 1 ' + (cx - rx) + ' ' + cy + ' Z'; }
+/* a ring of twisted cord lying flat, seen from above and in front: the point at angle a on its centre line */
+function ringAt(cx, cy, rx, ry, a) { return [cx + rx * cos(a), cy + ry * sin(a)]; }
+/* the ring itself, its twist ticks sliding round; hw and hy the half-width of the cord across and down */
+function cordRing(p, cx, cy, rx, ry, hw, hy, tw, n) {
+  p.path(oval(cx, cy, rx + hw, ry + hy) + ' ' + oval(cx, cy, rx - hw, ry - hy), { fill: 'cream', holes: true, w: 1.05 });
+  var i, a, sk = 0.9 * 22 / n;
+  p.clip(oval(cx, cy, rx + hw, ry + hy) + ' ' + oval(cx, cy, rx - hw, ry - hy), function () {
+    for (i = 0; i < n; i++) {
+      a = TAU * (i + tw) / n;
+      p.line(cx + (rx - hw - 1) * cos(a), cy + (ry - hy - 1) * sin(a), cx + (rx + hw + 1) * cos(a + 0.5 * sk * TAU / n * 3), cy + (ry + hy + 1) * sin(a + 0.5 * sk * TAU / n * 3), { w: 0.8, ink: 'brown', alpha: 0.75, wob: 0.3, detail: true });
+    }
+  });
+}
+/* a cloth wrap tied round the cord at angle a */
+function wrapAt(p, cx, cy, rx, ry, hw, hy, a, c) {
+  var d = 4.6 / rx, i0 = [rx - hw - 1.4, ry - hy - 1.1], o0 = [rx + hw + 1.4, ry + hy + 1.1];
+  p.poly([[cx + i0[0] * cos(a - d), cy + i0[1] * sin(a - d)], [cx + o0[0] * cos(a - d * 1.15), cy + o0[1] * sin(a - d * 1.15)], [cx + o0[0] * cos(a + d * 1.15), cy + o0[1] * sin(a + d * 1.15)], [cx + i0[0] * cos(a + d), cy + i0[1] * sin(a + d)]], { fill: c, w: 0.8 });
+  p.line(cx + (rx - hw * 0.4) * cos(a - d * 0.3), cy + (ry - hy * 0.4) * sin(a - d * 0.3), cx + (rx + hw * 0.4) * cos(a - d * 0.4), cy + (ry + hy * 0.4) * sin(a - d * 0.4), { w: 0.5, ink: 'white', alpha: 0.7, detail: true });
+}
+/* a tail of cord ending in a tassel, hanging from (x, y) and swinging by sw */
+function tail(p, x, y, L, sw, c) {
+  var sp = [], i, q;
+  for (i = 0; i <= 7; i++) { q = i / 7; sp.push([x + sw * L * q * q * 0.6, y + L * q]); }
+  strap(p, sp, 4.6, 3.4, { fill: 'cream', w: 0.8 });
+  var e = sp[7];
+  p.poly([[e[0] - 3, e[1]], [e[0] + 3, e[1]], [e[0] + 5, e[1] + 10], [e[0] - 5, e[1] + 10]], { fill: c, w: 0.8 });
+  p.line(e[0] - 1.5, e[1] + 1.5, e[0] - 2.4, e[1] + 9, { w: 0.4, detail: true }); p.line(e[0] + 1.5, e[1] + 1.5, e[0] + 2.4, e[1] + 9, { w: 0.4, detail: true });
+  p.rect(e[0] - 3.4, e[1] - 1, 6.8, 3, { fill: 'gold', w: 0.6, r: 1 });
+}
+D.add('mongkol', {
+  fam: 'daily', tapRest: 0.3, tags: ['mongkol', 'muay thai', 'headband', 'boxing', 'prajied', 'armband', 'fight', 'ring', 'luck', 'ritual', 'blessing', 'มงคล', 'มวยไทย', 'ปะเจียด', 'มงกุฎมวย'], loop: 2.4, still: 0.1, tapLen: 2, burst: 'star', burstAt: [48, 40], burstN: 6, burstSpread: 1.7, burstDelay: 0.7, burstColor: 'gold',
+  margin: [14, 10, 10, 10], about: 'the twisted cord ring wobbles as it floats, its twist sliding round, the tassels swinging after it; a prajied armband swings below', tapAbout: 'it is spun like a hoop, its coloured wraps and tassels flying round and out, and it settles with a wobble',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, spin = 0, fling = 0, wob = 0;
+    if (tapping) { spin = TAU * M.ease(M.seg(u, 0.05, 0.62)); fling = M.bump(M.seg(u, 0.05, 0.62)); var st = M.seg(u, 0.62, 1); wob = Math.exp(-4 * st) * sin(TAU * 2.5 * st) * (st > 0 ? 1 : 0); }
+    var cx = 46, cy = 34 + 2.2 * M.wave(t, 2, 0.1), rx = 31, ry = 14 + 2.6 * M.wave(t, 1, 0.2) + 3 * M.bump(M.seg(u, 0.05, 0.4)) * (tapping ? 1 : 0), hw = 5, hy = 4, ka = PI / 2 + spin;
+    /* the knot's tails first, so the ring's band lies over their tops */
+    var sw1 = 0.5 * M.wave(t, 1, -0.05) + 1.1 * fling + 0.6 * wob, sw2 = 0.5 * M.wave(t, 1, -0.15) + 1.1 * fling + 0.6 * wob, k = ringAt(cx, cy, rx, ry, ka);
+    p.pivot(k[0], k[1], 0, 1, function () { tail(p, k[0] - 2.5, k[1] - 1, 26, sw1, 'red'); tail(p, k[0] + 3, k[1] - 1, 20, sw2, 'a'); });
+    cordRing(p, cx, cy, rx, ry, hw, hy, 2 * t, 30);
+    [[0.1, 'red'], [PI * 0.5, 'a'], [PI, 'blue'], [PI * 1.5, 'leaf']].forEach(function (c) { wrapAt(p, cx, cy, rx, ry, hw, hy, ka + c[0], c[1]); });
+    p.circle(k[0], k[1], 4, { fill: 'gold', w: 0.9 }); p.dot(k[0] - 1, k[1] - 1, 1, 'white');
+    /* the prajied: a smaller loop of cord, lower right, with a tail and a tassel */
+    var px = 74, py = 76 + 1.4 * M.wave(t, 2, 0.4), prx = 13.5, pry = 6;
+    p.pivot(px, py, 0.04 * M.wave(t, 1, 0.3), 1, function () {
+      tail(p, px - 12, py + 5, 13, -0.5 * M.wave(t, 1, 0.1) - 0.3 * fling, 'blue');
+      cordRing(p, px, py, prx, pry, 3.2, 2.6, 2 * t, 16);
+      wrapAt(p, px, py, prx, pry, 3.2, 2.6, PI * 0.5, 'a'); wrapAt(p, px, py, prx, pry, 3.2, 2.6, PI * 1.4, 'red');
+      p.circle(px - 13, py + 4.4, 2.6, { fill: 'red', w: 0.7 });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- massage */
+/* hands, as faces.js builds them: a limb is a chain of bones that bend one way, and the hand one outline round the palm and every limb */
+function limb(x, y, th, lens, bends, w0, w1) {
+  var c = [[x, y]], n = lens.length, a = th, i, L = [], R = [];
+  for (i = 0; i < n; i++) { a += bends[i] || 0; c.push([c[i][0] + sin(a) * lens[i], c[i][1] - cos(a) * lens[i]]); }
+  for (i = 0; i <= n; i++) {
+    var p0 = c[Math.max(0, i - 1)], p1 = c[Math.min(n, i + 1)], dx = p1[0] - p0[0], dy = p1[1] - p0[1], d = Math.hypot(dx, dy) || 1, w = (w0 + (w1 - w0) * i / n) / 2;
+    L.push([c[i][0] + dy / d * w, c[i][1] - dx / d * w]); R.push([c[i][0] - dy / d * w, c[i][1] + dx / d * w]);
+    if (i === n) { var tip = [], k; for (k = 1; k < 4; k++) { var q = k * PI / 4; tip.push([c[i][0] + (dy / d * cos(q) + dx / d * sin(q)) * w, c[i][1] + (-dx / d * cos(q) + dy / d * sin(q)) * w]); } }
+  }
+  return { l: L, r: R, tip: tip, c: c, d0: [(c[1][0] - c[0][0]) / (lens[0] || 1), (c[1][1] - c[0][1]) / (lens[0] || 1)] };
+}
+function outline(items) {
+  var out = [];
+  items.forEach(function (it, k) {
+    if (!it.l) { out.push(it); return; }
+    var pv = items[k - 1], i;
+    if (pv && pv.l) out.push([(pv.r[0][0] + it.l[0][0]) / 2 - (pv.d0[0] + it.d0[0]) / 2 * (it.dep == null ? 2.2 : it.dep), (pv.r[0][1] + it.l[0][1]) / 2 - (pv.d0[1] + it.d0[1]) / 2 * (it.dep == null ? 2.2 : it.dep)]);
+    for (i = 1; i < it.l.length; i++) out.push(it.l[i]);
+    it.tip.forEach(function (q) { out.push(q); });
+    for (i = it.r.length - 1; i >= 1; i--) out.push(it.r[i]);
+  });
+  return out;
+}
+var FB = [[-13.2, -33, 24, 9.2], [-4.4, -35.5, 27.5, 9.2], [4.4, -34.5, 24.5, 8.8], [12.6, -31, 19, 7.8]];
+/* a hand seen from the back, wrist at the origin, fingers up, the thumb out to the left; its nails show */
+function backHand(p, o) {
+  var sp = o.spread == null ? 0.3 : o.spread, it = [[-10.5, 4], [-15.5, -2.5], [-16.5, -8]], fs = [], i;
+  var th = limb(-14, -11, o.thumb == null ? -0.9 : o.thumb, [11.5, 10.5], o.tb || [0, 0.2], 11, 9); th.dep = 0; it.push(th); it.push([-16.8, -22.5]);
+  FB.forEach(function (f, j) { var g = limb(f[0], f[1], (j - 1.5) * 0.22 * sp, [f[2] * 0.46, f[2] * 0.3, f[2] * 0.24], (o.bends && o.bends[j]) || [0, 0, 0], f[3], f[3] * 0.84); fs.push(g); it.push(g); });
+  it.push([17.4, -23], [16, -8], [11, 4]);
+  p.curve(outline(it), { close: true, fill: 'skin', w: 1.05 });
+  fs.concat([th]).forEach(function (g) {
+    var n = g.c.length - 1, a = g.c[n - 1], b = g.c[n], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+    p.ellipse(b[0] - dx / d * 2.6, b[1] - dy / d * 2.6, 1.9, 2.6, { rot: Math.atan2(dy, dx) + PI / 2, fill: 'pink', w: 0.4, detail: true, wob: 0.3 });
+  });
+  p.path('M-6 -13 C-3 -17 0 -19 4 -21', { w: 0.45, alpha: 0.4, detail: true });
+  return th;
+}
+/* where a point in a hand's own frame lands in the box, for the hand set down at (wx, wy) turned by rot, scaled sc, mirrored when sgn is -1 */
+function toBox(wx, wy, rot, sc, sgn, lx, ly) { var x = sgn * lx * sc, y = ly * sc; return [wx + x * cos(rot) - y * sin(rot), wy + x * sin(rot) + y * cos(rot)]; }
+
+/* a rolled herbal compress, ลูกประคบ: a ball of cloth gathered and tied at the neck, steam off it */
+function compress(p, t, sq) {
+  p.pivot(0, 14, 0, [1 + 0.1 * sq, 1 - 0.14 * sq], function () {
+    p.path('M-5.5 -11 C-4 -17 -3.2 -20 -3.2 -24 L3.2 -24 C3.2 -20 4 -17 5.5 -11 Z', { fill: 'cream', w: 0.9 });
+    p.path('M-3.5 -24 L-8 -31 L-2.6 -27.5 L0 -33 L2.6 -27.5 L8 -31 L3.5 -24 Z', { fill: 'cream', w: 0.8 });
+    p.circle(0, 2, 14.5, { fill: 'cream', w: 1.1 });
+    p.clip(function () { p.circle(0, 2, 14.5); }, function () {
+      p.blob(-6, 5, 6, { fill: 'leaf', alpha: 0.35, line: false, lumpy: 0.3, seed: 4 }); p.blob(6, -1, 4.6, { fill: 'wood', alpha: 0.35, line: false, lumpy: 0.3, seed: 6 }); p.blob(2, 10, 4, { fill: 'leaf', alpha: 0.3, line: false, lumpy: 0.3, seed: 9 });
+      [[-5, 4], [0, 7], [5, 4]].forEach(function (c) { p.path('M' + c[0] * 0.3 + ' -10 C' + c[0] * 2.2 + ' -4 ' + c[0] * 2.6 + ' 3 ' + c[0] * 2.2 + ' 14', { w: 0.45, detail: true, alpha: 0.65 }); });
+    });
+    p.line(-4.5, -16.5, 4.5, -16.5, { w: 1.4, ink: 'brown', cap: 'round' }); p.line(-4.2, -14, 4.2, -14, { w: 1.1, ink: 'brown', cap: 'round' });
+    p.path('M0 -16 C-4 -13 -6 -9 -5 -7', { w: 0.9, ink: 'brown', cap: 'round', wob: 0.3 }); p.path('M0 -16 C4 -13 6 -9 5 -7', { w: 0.9, ink: 'brown', cap: 'round', wob: 0.3 });
+  });
+}
+function leafPair(p, x, y, k, r) { p.at(x, y, r, k, function () { p.path('M0 0 C-5 -3 -9 0 -8 4 C-7 7 -2 7 0 4 C2 7 7 7 8 4 C9 0 5 -3 0 0 Z', { fill: 'leaf', w: 0.8 }); p.line(0, 0, 0, 4.5, { w: 0.4, detail: true }); }); }
+
+var FOOT = 'M43 28 C37 33 36 43 38 53 C39 63 40 75 44 83 C48 90 54 93 60 93 C68 93 74 88 75 78 C76 70 70 64 69 57 C68 49 74 44 76 36 C77 30 75 26 69 24 C63 22 55 22 50 24 C46 25 44 27 43 28 Z';
+D.add('massage', {
+  fam: 'daily', tapRest: 0.45, tags: ['massage', 'thai massage', 'foot massage', 'foot', 'sole', 'reflexology', 'herbal compress', 'luk pra kob', 'spa', 'relax', 'wellness', 'นวด', 'นวดเท้า', 'นวดไทย', 'ลูกประคบ', 'สปา'], loop: 1.6, still: 0.15, ratio: 1.6, tapLen: 2.4, burst: 'zzz', burstAt: [62, 12], burstN: 3, burstSpread: 1.3, burstDelay: 0.55,
+  margin: [16, 8, 14, 10], about: 'two hands press the sole in turn, a squeeze and a release, the toes curling, while a herbal compress steams on its saucer', tapAbout: 'the hands ease off and the compress hops over to the foot, dabs it twice with a puff of steam, and hops home; the toes wiggle and the sole warms',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, sc = 0.6;
+    p.move(8, 0);
+    var pl = 0.5 + 0.5 * M.wave(t, 2, -0.25), pr = 0.5 + 0.5 * M.wave(t, 2, -0.31), ease = 0, hop = 0, d1 = 0, d2 = 0, warm = 0, away = 0;
+    if (tapping) {
+      away = M.ease(M.seg(u, 0.04, 0.2)) * (1 - M.ease(M.seg(u, 0.78, 0.94)));
+      var a1 = M.seg(u, 0.12, 0.38), a2 = M.seg(u, 0.64, 0.9);
+      ease = M.ease(a1) * (1 - M.ease(a2)); hop = (a1 > 0 && a1 < 1 ? 4 * a1 * (1 - a1) : 0) + (a2 > 0 && a2 < 1 ? 4 * a2 * (1 - a2) : 0);
+      d1 = M.bump(M.seg(u, 0.38, 0.48)); d2 = M.bump(M.seg(u, 0.5, 0.6)); warm = M.ease(M.seg(u, 0.4, 0.62)) * (1 - M.ease(M.seg(u, 0.84, 1)));
+      pl *= 1 - away; pr *= 1 - away;
+    }
+    var wig = tapping ? M.bump(M.seg(u, 0.38, 0.8)) : 0;
+    /* the compress, on its saucer, and the herbs by it */
+    p.ellipse(132, 86, 18, 4.4, { fill: 'wood', w: 0.9 });
+    p.ellipse(132, 85, 14, 2.8, { fill: 'sand', w: 0.5, detail: true });
+    leafPair(p, 108, 90, 0.8, -0.35); leafPair(p, 154, 91, 0.7, 0.3);
+    p.circle(147, 92, 3.5, { fill: 'orange', w: 0.7 }); p.circle(147, 92, 1.7, { w: 0.4, detail: true });
+    p.path('M112 93 C120 92 128 93 134 94', { w: 1.1, ink: 'leaf', cap: 'round', detail: true });
+    /* the foot, its toes curling a little with each press */
+    var press = (pl + pr) / 2, curl = 0.9 * press + 1.2 * wig * sin(TAU * 4 * u);
+    p.pivot(60, 80, 0.012 * (pl - pr) + 0.02 * wig * sin(TAU * 3 * u), [1 - 0.022 * press, 1], function () {
+      [[72, 15.5, 6.6, 9.4, 0.18], [62, 12, 4.4, 6.4, 0.06], [53.5, 13.5, 4, 5.8, -0.06], [46, 17, 3.7, 5.2, -0.2], [40, 22, 3.4, 4.6, -0.36]].forEach(function (q, j) {
+        p.ellipse(q[0], q[1] + curl * (1 - j * 0.12), q[2], q[3], { rot: q[4], fill: 'skin', w: 1 });
+      });
+      p.path(FOOT, { fill: 'skin' });
+      p.path('M42 38 C50 32.5 66 32 75 39', { w: 0.5, detail: true, alpha: 0.6 }); p.path('M70 59 C62 52 52 52 46 57', { w: 0.45, detail: true, alpha: 0.55 });
+      p.blob(60, 80, 12, { fill: 'rose', line: false, alpha: 0.14 + 0.3 * warm, lumpy: 0.1, sy: 1.1 });
+      p.blob(58, 42, 11, { fill: 'rose', line: false, alpha: 0.1 + 0.3 * warm, lumpy: 0.1, sy: 0.8 });
+    });
+    /* the hands, sleeves first: each pushes in with its thumb and lets go, the left leading */
+    [[1, pl, 30, 94, 0.1], [-1, pr, 90, 94, -0.1]].forEach(function (h, j) {
+      var sgn = h[0], pw = h[1], wx = h[2] + sgn * (2.6 * pw + 4 * away) , wy = h[3] - 1.5 * pw + 3 * away, rot = h[4] + sgn * 0.045 * pw;
+      p.at(wx, wy, rot, [-sgn * sc, sc], function () { p.rect(-12, 1, 24, 26, { fill: 'c', r: 3, w: 1.4 }); p.line(-8, 6, 8, 6, { w: 0.45, detail: true, ink: 'white' }); });
+      p.at(wx, wy, rot, [-sgn * sc, sc], function () { backHand(p, { spread: 0.3 }); });
+    });
+    /* pressure: a ring from each thumb's tip, drawn out and let go */
+    [[1, pl, 30, 94, 0.1, 0], [-1, pr, 90, 94, -0.1, 0.06]].forEach(function (h) {
+      var sgn = h[0], pw = h[1], wx = h[2] + sgn * (2.6 * pw + 4 * away), wy = h[3] - 1.5 * pw + 3 * away, rot = h[4] + sgn * 0.045 * pw, tip = toBox(wx, wy, rot, sc, -sgn, -31, -24), ph = M.frac(2 * t - 0.25 - h[5]), g = 1 - away;
+      var rr = 3 + 6 * M.easeOut(ph);
+      if (g > 0.3) p.span('M' + (tip[0] - rr) + ' ' + tip[1] + ' A' + rr + ' ' + rr * 0.75 + ' 0 1 1 ' + (tip[0] + rr) + ' ' + tip[1] + ' A' + rr + ' ' + rr * 0.75 + ' 0 1 1 ' + (tip[0] - rr) + ' ' + tip[1], M.easeIn(M.seg(ph, 0.4, 1)), M.easeOut(M.seg(ph, 0, 0.5)), { w: 0.8, ink: 'rose', cap: 'round' });
+    });
+    /* the compress at home, steaming; or out on a hop to the sole */
+    var hx = M.lerp(132, 70, ease), hy2 = M.lerp(66, 40, ease) - 24 * hop + 3 * (d1 + d2), sq = d1 + d2;
+    [[-5, 0], [0, 0.34], [5, 0.67]].forEach(function (c) {
+      var ph = M.frac(t + c[1]), d = 'M' + (hx + c[0]) + ' ' + (hy2 - 32) + ' C' + (hx + c[0] + 6) + ' ' + (hy2 - 39) + ' ' + (hx + c[0] - 6) + ' ' + (hy2 - 46) + ' ' + (hx + c[0]) + ' ' + (hy2 - 55);
+      p.span(d, M.easeIn(M.seg(ph, 0.4, 1)), M.easeOut(M.seg(ph, 0, 0.6)), { w: 0.9, ink: 'grey', cap: 'round' });
+    });
+    p.at(hx, hy2, 0.12 * sin(TAU * 2 * M.seg(u, 0.12, 0.38)) * (tapping ? 1 : 0), 1, function () { compress(p, t, sq); });
+    if (d1 + d2 > 0.05) for (i = 0; i < 5; i++) { var an = -2.6 + i * 0.5; p.line(hx + 17 * cos(an), hy2 + 2 + 17 * sin(an), hx + (18 + 6 * (d1 + d2)) * cos(an), hy2 + 2 + (18 + 6 * (d1 + d2)) * sin(an), { w: 0.7, ink: 'a', cap: 'round' }); }
+  }
+});
+
+/* ---------------------------------------------------------------- rice-paddy */
+/* a small green frog in profile facing left, about the middle of its body; air 0 sits, 1 is stretched out in a leap */
+function frog(p, air, blink, thr) {
+  p.path('M2 2 C8 2 12 4 14 6.5', { w: 1.2 * (0.6 + 0.4 * air), ink: 'green', cap: 'round', alpha: air });
+  p.path('M5 1 C7 -3 12 -3 14 1 C12 5 7 5 5 1 Z', { fill: 'leaf', w: 0.8 });
+  p.path('M-8 1 C-8 -4 -3 -6 2 -5 C8 -4 10 0 8 3 C6 6 -4 6 -8 1 Z', { fill: 'leaf', w: 0.95 });
+  p.path('M-7 2.2 C-4 5 3 5.4 7 3.2 C3 6.4 -4 6.4 -7 2.2 Z', { fill: 'mint', line: false });
+  p.circle(-6, -5.5, 2.6, { fill: 'white', w: 0.8 }); p.dot(-6.7, -5.5, blink > 0.5 ? 1.1 : 0.4, 'ink');
+  p.line(-9, 1.6, -4.5, 2.1, { w: 0.5, detail: true });
+  if (thr > 0.01) p.ellipse(-5, 2.6, 2.2 * (1 + 0.5 * thr), 1.4 * (1 + 0.5 * thr), { fill: 'mint', w: 0.4, detail: true });
+  p.path('M-2 3 C-1 6 0 8 -1 10', { w: 1.1, ink: 'green', cap: 'round', alpha: 1 - 0.4 * air });
+}
+D.add('rice-paddy', {
+  fam: 'daily', tapRest: 0.6, tags: ['rice', 'paddy', 'rice field', 'farm', 'field', 'harvest', 'seedlings', 'countryside', 'agriculture', 'green', 'rural', 'ทุ่งนา', 'นาข้าว', 'ข้าว', 'ต้นข้าว'], loop: 3.2, still: 0.2, tapLen: 2.6, burst: 'drop', burstAt: [64, 74], burstN: 6, burstSpread: 1.5, burstDelay: 0.42, burstColor: 'sky', burstGravity: 100,
+  margin: [14, 10, 6, 10], about: 'rice seedlings in rows lean in a gust that crosses the field, the water glinting between them, a cloud drifting across the hills', tapAbout: 'a frog on the bank crouches and leaps into the paddy; rings spread across the water, shaking the seedlings, and it paddles home',
+  draw: function (p, t, s) {
+    var u = Math.max(0, s.tap), tapping = s.tap >= 0, i, j, LX = 62, LY = 77;
+    var a1 = tapping ? M.seg(u, 0.1, 0.42) : 0, a2 = tapping ? M.seg(u, 0.78, 0.97) : 0, sink = tapping ? M.ease(M.seg(u, 0.42, 0.5)) * (1 - M.ease(M.seg(u, 0.7, 0.8))) : 0;
+    /* the far side: sun, hills, a cloud that crosses once a loop */
+    p.circle(80, 14, 7.5, { fill: 'yellow', w: 0.9, glow: 0.4 });
+    for (i = 0; i < 8; i++) p.at(80, 14, TAU * i / 8 + TAU * t / 8, 1, function () { p.line(0, -10, 0, -13 - 1.4 * M.wave(t, 2, i * 0.125), { w: 0.7, ink: 'a', cap: 'round' }); });
+    p.path('M0 38 C8 28 14 22 24 25 C30 27 36 18 46 19 C56 20 62 28 72 26 C82 24 90 30 100 32 L100 40 L0 40 Z', { fill: 'mint' });
+    p.path('M0 38 C8 28 14 22 24 25 C30 27 36 18 46 19 C56 20 62 28 72 26 C82 24 90 30 100 32', { w: 1 });
+    p.path('M20 31 C28 28 36 28 42 30', { w: 0.4, detail: true, alpha: 0.6 });
+    var cf = M.frac(t);
+    if (cf > 0.01 && cf < 0.99) p.at(-40 + 180 * cf, 13, 0, 1, function () { p.path('M-14 4 C-17 -3 -8 -6 -4 -3 C-2 -10 9 -10 10 -3 C16 -5 21 1 17 4 Z', { fill: 'white', w: 0.8 }); });
+    /* the banks and the water between them, in perspective */
+    p.rect(-4, 38, 108, 66, { fill: 'leaf', line: false, alpha: 0.35 });
+    p.poly([[20, 38], [80, 38], [106, 93], [-6, 93]], { fill: 'sky', w: 1, alpha: 0.6 });
+    p.path('M20 38 L-6 93', { w: 1.2, ink: 'brown' }); p.path('M80 38 L106 93', { w: 1.2, ink: 'brown' });
+    p.rect(-4, 93, 108, 8, { fill: 'sand', w: 1 });
+    [[6, 50], [94, 50], [4, 72], [97, 74], [12, 90], [90, 91]].forEach(function (g) { p.path('M' + g[0] + ' ' + g[1] + ' L' + (g[0] - 1) + ' ' + (g[1] - 4) + ' M' + g[0] + ' ' + g[1] + ' L' + (g[0] + 1) + ' ' + (g[1] - 5), { w: 0.7, ink: 'green', cap: 'round', detail: true }); });
+    /* the sky in the water: long bright streaks that drift a little */
+    [[50, 56, 14, 0], [64, 30, 20, 0.3], [87, 60, 26, 0.6]].forEach(function (c) { var dx = 3 * M.wave(t, 1, c[3]); p.line(c[1] + dx, c[0], c[1] + c[2] + dx, c[0], { w: 0.9, ink: 'white', cap: 'round' }); });
+    /* rings from the frog's landing, flat on the water */
+    if (tapping) for (i = 0; i < 3; i++) {
+      var ru = M.seg(u, 0.42 + i * 0.08, 0.92), rr = 4 + 38 * M.easeOut(ru);
+      if (ru > 0 && ru < 1) p.span(oval(LX, LY, rr, rr * 0.3), M.easeIn(M.seg(ru, 0.55, 1)), M.easeOut(M.seg(ru, 0, 0.4)), { w: 0.9, ink: 'blue', cap: 'round' });
+    }
+    /* the seedlings, farthest row first, each clump a handful of blades leaning in the gust */
+    [44, 51, 60, 70, 82].forEach(function (y, r) {
+      var f = (y - 38) / 55, sp = 13 + 11 * f, hw = 30 + 26 * f, h = 3.8 + 12 * f, x0 = 50 - Math.floor((hw - 4) / sp) * sp + (r % 2 ? sp / 2 : 0), x;
+      for (x = x0; x <= 50 + hw + 0.1; x += sp) {
+        if (Math.abs(x - 50) > hw - 4) continue;
+        var gust = 0.55 + 0.45 * M.wave(t, 1, -(x - 50) / 140 - r * 0.03), sway = (4.8 * f + 1.2) * (M.wave(t, 1, -(x - 50) / 160 - r * 0.04) * (0.7 + 0.3 * gust)), shock = 0;
+        if (tapping) { var d = Math.hypot((x - LX) * 0.8, (y - LY) * 2.4), front = 42 * M.easeOut(M.seg(u, 0.42, 0.95)); shock = 4.2 * f * sin(TAU * 3 * M.seg(u, 0.42, 0.95)) * Math.exp(-Math.pow((d - front) / 12, 2)) * (1 - M.seg(u, 0.8, 1)); }
+        for (j = 0; j < 4; j++) {
+          var bx = x + (j - 1.5) * 1.3 * (0.5 + f), tip = (j - 1.5) * 3.6 * (0.5 + f) + (sway + shock) * (0.7 + 0.3 * (j % 2)), bh = h * (j % 3 === 1 ? 1.1 : 0.9);
+          p.path('M' + bx + ' ' + y + ' Q' + (bx + tip * 0.2) + ' ' + (y - bh * 0.6) + ' ' + (bx + tip) + ' ' + (y - bh), { w: 0.55 + 0.7 * f, ink: j % 2 ? 'green' : 'leaf', cap: 'taper', detail: r < 2 });
+        }
+        if (r > 1) p.line(x - 2.2 * (0.5 + f), y + 1.2, x + 2.2 * (0.5 + f), y + 1.2, { w: 0.4, ink: 'white', detail: true, alpha: 0.9 });
+      }
+    });
+    /* the water glints, a star of light opening and closing at a few places */
+    [[30, 76, 0.0], [72, 88, 0.3], [58, 66, 0.55], [38, 56, 0.8], [18, 88, 0.42], [80, 70, 0.15]].forEach(function (c) {
+      var g = M.bump(M.seg(M.frac(t + c[2]), 0, 0.28)), r1 = 3.4 * g;
+      if (r1 > 0.4) p.poly([[c[0], c[1] - r1], [c[0] + r1 * 0.22, c[1] - r1 * 0.22], [c[0] + r1, c[1]], [c[0] + r1 * 0.22, c[1] + r1 * 0.22], [c[0], c[1] + r1], [c[0] - r1 * 0.22, c[1] + r1 * 0.22], [c[0] - r1, c[1]], [c[0] - r1 * 0.22, c[1] - r1 * 0.22]], { fill: 'white', w: 0.5 });
+    });
+    /* the frog: sits on the bank right of the field, leaps in, shows only its eyes, paddles back and climbs out */
+    var fx = 86, fy = 90, air = 0, vis = 1, blink = M.frac(t * 1 + 0.2) < 0.07 ? 0 : 1, thr = 0.5 + 0.5 * M.wave(t, 2);
+    if (tapping) {
+      var crouch = M.bump(M.seg(u, 0.02, 0.12));
+      if (u < 0.42) { fx = M.lerp(86, LX, M.ease(a1)); fy = M.lerp(90, LY - 1, M.easeIn(a1) * 0.2 + 0.8 * M.ease(a1)) - 30 * 4 * a1 * (1 - a1) + 3 * crouch; air = a1 > 0 && a1 < 1 ? 1 : 0; }
+      else if (u < 0.78) { fx = LX; fy = LY; }
+      else { fx = M.lerp(LX, 86, M.ease(a2)); fy = M.lerp(LY, 90, M.ease(a2)) - 4 * 4 * a2 * (1 - a2); }
+    }
+    if (tapping && u >= 0.42 && u < 0.97) {
+      var dive = sink, swim = M.seg(u, 0.78, 0.97);
+      p.clip(function () { p.rect(-20, -20, 140, fy + 0.5 - 3, {}); }, function () { p.at(fx, fy + 6 * dive * (1 - swim), 0, 1, function () { p.at(0, 0, 0.0, [swim > 0.7 ? 1 : 1, 1], function () { frog(p, 0, blink, thr); }); }); });
+      p.span(oval(fx - 5, fy + 1.5, 6, 2), 0, 1, { w: 0.6, ink: 'white', cap: 'round' });
+    } else p.at(fx, fy, air ? -0.5 + 1.0 * a1 : 0, [1, 1 - 0.18 * (tapping ? M.bump(M.seg(u, 0.02, 0.12)) : 0)], function () { frog(p, air, blink, thr); });
+  }
+});
+
+})(Dingbats);
+
 /* Fete: a charity day on a lawn. First drawn for the Golf Ball Drop page (Rotary Club of Chiang Mai
    International, 2026-10-24): a golf ball that bounces with its dimples turning, and the chalk X it
    is dropped onto. In riso every white here is a fill, so it is the paper showing. */
@@ -9711,6 +10548,2513 @@ D.add('x-mark', {
   }
 });
 
+})(Dingbats);
+
+/* Khon: the head masks (หัวโขน) of the Ramakien, seen from the front as they sit on a stand or are held up.
+   Hanuman white, Tosakanth deep green under a crown of stacked faces, Phra Ram green and Phra Lak gold under the
+   chada, Sukreep red under a tall peaked crown, and a violet yak (ยักษ์) of the kind that guards a temple gate. */
+(function (D) {
+'use strict';
+var M = D.math, TAU = M.TAU;
+
+var DEEP = '#1C5E3F', DEEP2 = '#2F8A5C', RAMG = '#4FA867', VIOLET = '#7B4FB0', VIOLET2 = '#B79BE0', MAW = '#7A1626', RUBY = '#D8343B', SUK = '#D9402E', LAK = '#F5C93C';
+
+/* ---------------------------------------------------------------- helpers */
+/* draw fn once for the right side and once mirrored for the left: x is the distance from the centre line (x = 50) */
+function mir(p, fn) { [1, -1].forEach(function (d) { p.at(50, 0, 0, [d, 1], function () { fn(d); }); }); }
+/* a closed outline from its right half, listed from the top of the centre line to the bottom of it; [dx, y] */
+function loop(h) {
+  var out = [], i;
+  for (i = 0; i < h.length; i++) out.push([50 + h[i][0], h[i][1]]);
+  for (i = h.length - 2; i >= 1; i--) out.push([50 - h[i][0], h[i][1]]);
+  return out;
+}
+/* y of a polyline [[dx, y] …] at dx */
+function yAt(h, dx) {
+  var i;
+  for (i = 1; i < h.length; i++) if (dx <= h[i][0] || i === h.length - 1) { var a = h[i - 1], b = h[i], u = b[0] === a[0] ? 0 : M.clamp((dx - a[0]) / (b[0] - a[0]), 0, 1); return a[1] + (b[1] - a[1]) * u; }
+  return h[h.length - 1][1];
+}
+/* the jaw drops: points below y0 move down by d, more the lower they are */
+function drop(h, y0, y1, d) { return h.map(function (q) { return [q[0], q[1] + d * M.ease((q[1] - y0) / (y1 - y0))]; }); }
+/* four-point glint with a white heart, so it shows on gold and on paper */
+function glint(p, x, y, k) { if (k > 0.04) p.star(x, y, 1.0 + 4.6 * k, 0.5 + 0.7 * k, 4, { fill: 'white', w: 0.5, wob: 0.3 }); }
+/* a cut jewel */
+function gem(p, x, y, r, c, g) { p.poly([[x, y - r * 1.25], [x + r, y], [x, y + r * 1.25], [x - r, y]], { fill: c, w: 0.5, wob: 0.3 }); if (g) glint(p, x - r * 0.2, y - r * 0.3, g); }
+/* a crescent moon centred at the origin, horns up and to the right */
+function moon(p, R, o) {
+  var r = R * 0.84, cx = R * 0.36, cy = -R * 0.3, d = Math.hypot(cx, cy), tc = Math.atan2(cy, cx), b = Math.acos((R * R + d * d - r * r) / (2 * R * d)), g = Math.acos((r * r + d * d - R * R) / (2 * r * d)), pc = Math.atan2(-cy, -cx), pts = [], i, a;
+  for (i = 0; i <= 18; i++) { a = tc + b + (TAU - 2 * b) * i / 18; pts.push([Math.cos(a) * R, Math.sin(a) * R]); }
+  for (i = 0; i <= 12; i++) { a = pc - g + 2 * g * i / 12; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+  var q0 = pts[18], q1 = pts[19], q2 = pts[pts.length - 1];
+  if (Math.hypot(q1[0] - q0[0], q1[1] - q0[1]) > Math.hypot(q2[0] - q0[0], q2[1] - q0[1])) pts = pts.slice(0, 19).concat(pts.slice(19).reverse());
+  p.poly(pts, o);
+}
+/* a bulging eye: a ring, white, a big pupil that looks about, and a lid (lid 0..1) that comes down over it in the colour of the face; shut, it is a curved line */
+function eye(p, x, y, r, o) {
+  var lk = o.look || [0, 0], lid = o.lid || 0, px = x + lk[0] * r * 0.32, py = y + lk[1] * r * 0.32, pr = r * (o.pupil || 0.56);
+  if (o.glow) p.circle(x, y, r * 1.55, { fill: 'flame', line: false, alpha: 0.5 * o.glow, glow: 0.9 * o.glow });
+  p.circle(x, y, r * 1.2, { fill: o.rim || 'gold', w: 0.7 });
+  p.circle(x, y, r, { fill: 'white', w: 0.55 });
+  p.circle(px, py, pr, { fill: o.iris || 'black', w: 0.4, wob: 0.3 });
+  if (lid < 0.7 && !o.cut) p.dot(px - pr * 0.36, py - pr * 0.4, pr * 0.3, 'white');
+  if (o.cut) {
+    var sg = x < 50 ? 1 : -1, ci = y - r * 0.95 + r * 1.2 * o.cut;
+    p.clip(function () { p.circle(x, y, r * 1.02, { fill: 'white' }); }, function () {
+      p.path('M' + (x - sg * (r + 3)) + ' ' + (y - r - 4) + ' L' + (x + sg * (r + 3)) + ' ' + (y - r - 4) + ' L' + (x + sg * (r + 3)) + ' ' + ci + ' L' + (x - sg * (r + 3)) + ' ' + (y - r * 0.95) + ' Z', { fill: o.face, w: 1, wob: 0.3 });
+    });
+  }
+  if (lid > 0.02) {
+    var ye = y - r + 2 * r * lid, bow = 1 + 1.6 * M.bump(lid) + 1.4 * lid;
+    p.clip(function () { p.circle(x, y, r * 1.02, { fill: 'white' }); }, function () {
+      p.path('M' + (x - r - 2) + ' ' + (y - r - 3) + ' L' + (x + r + 2) + ' ' + (y - r - 3) + ' L' + (x + r + 2) + ' ' + ye + ' Q' + x + ' ' + (ye + bow) + ' ' + (x - r - 2) + ' ' + ye + ' Z', { fill: o.face, w: 0.9, wob: 0.3 });
+    });
+    if (lid > 0.8) p.path('M' + (x - r * 0.85) + ' ' + (y + r * 0.05) + ' Q' + x + ' ' + (y + r * 0.78) + ' ' + (x + r * 0.85) + ' ' + (y + r * 0.05), { w: 1.15, wob: 0.3 });
+  }
+}
+/* a small pointed tooth hanging from (x, y) down (dir 1) or standing up (dir -1) */
+function tooth(p, x, y, w, h, dir, tip) { p.poly([[x - w / 2, y], [x + w / 2, y], [x + (tip || 0), y + h * dir]], { fill: 'white', w: 0.5, wob: 0.3 }); }
+/* a tusk that curves: base at (x, y), hanging (dir 1) or rising (dir -1), bowing toward bow */
+function tusk(p, x, y, h, w, dir, bow) {
+  p.path('M' + (x - w / 2) + ' ' + y + ' C' + (x - w / 2 + bow * 0.3) + ' ' + (y + h * 0.5 * dir) + ' ' + (x + bow * 0.9) + ' ' + (y + h * 0.8 * dir) + ' ' + (x + bow) + ' ' + (y + h * dir) + ' C' + (x + w / 2 + bow * 0.6) + ' ' + (y + h * 0.6 * dir) + ' ' + (x + w / 2) + ' ' + (y + h * 0.3 * dir) + ' ' + (x + w / 2) + ' ' + y + ' Z', { fill: 'white', w: 0.6, wob: 0.4 });
+}
+/* a held mask sways a little on the hand that holds it; k fits the crown into the box */
+function held(p, t, sway, k, fn) { p.pivot(50, 98, sway * 0.022 * M.wave(t, 1, 0.15), k, function () { p.move(0, 0.7 * M.wave(t, 2, 0.1)); fn(); }); }
+/* the lid of a blink: 0 → 1 → 0 inside the window [a, b] of the loop */
+function blink(t, a, b) { return M.bump(M.seg(t, a, b)); }
+/* a leaf-shaped flame standing at (x, y), leaning out (dir 1 right, -1 left): the small ornament at the corners of a crown */
+function flame(p, x, y, dir, h, c) {
+  p.path('M' + x + ' ' + y + ' C' + (x + dir * 1.8) + ' ' + (y - h * 0.3) + ' ' + (x + dir * 3.4) + ' ' + (y - h * 0.6) + ' ' + (x + dir * 2.6) + ' ' + (y - h) + ' C' + (x + dir * 0.6) + ' ' + (y - h * 0.65) + ' ' + (x - dir * 1.2) + ' ' + (y - h * 0.45) + ' ' + (x - dir * 3.2) + ' ' + (y - h * 0.3) + ' Z', { fill: c || 'gold', w: 0.6, wob: 0.3 });
+}
+/* a tongue of fire standing at (x, y), h tall, w wide, the tip pushed sideways by lean; colour only, no ink */
+function blaze(p, x, y, lean, h, w) {
+  if (h < 0.6) return;
+  p.path('M' + (x - w) + ' ' + y + ' C' + (x - w) + ' ' + (y - h * 0.5) + ' ' + (x + lean * 0.5) + ' ' + (y - h * 0.62) + ' ' + (x + lean) + ' ' + (y - h) + ' C' + (x + w * 0.6 + lean * 0.4) + ' ' + (y - h * 0.62) + ' ' + (x + w) + ' ' + (y - h * 0.45) + ' ' + (x + w) + ' ' + y + ' Z', { fill: 'flame', line: false, glow: 0.4 });
+  p.path('M' + (x - w * 0.5) + ' ' + y + ' C' + (x - w * 0.5) + ' ' + (y - h * 0.3) + ' ' + (x + lean * 0.3) + ' ' + (y - h * 0.4) + ' ' + (x + lean * 0.55) + ' ' + (y - h * 0.62) + ' C' + (x + w * 0.4) + ' ' + (y - h * 0.38) + ' ' + (x + w * 0.5) + ' ' + (y - h * 0.25) + ' ' + (x + w * 0.5) + ' ' + y + ' Z', { fill: 'yellow', line: false });
+}
+/* a star drifting out of a mouth: leaves (x0, y0) at the start of its window u, climbs and sways to (x1, y1), then is taken back */
+function drift(p, u, x0, y0, x1, y1, r, c, ph) {
+  var k = M.easeOut(M.seg(u, 0, 0.22)) * (1 - M.easeIn(M.seg(u, 0.8, 1)));
+  if (u <= 0 || u >= 1 || k < 0.03) return;
+  var e = M.easeOut(u), x = x0 + (x1 - x0) * e + 3.5 * Math.sin(TAU * (u * 1.5 + ph)), y = y0 + (y1 - y0) * e;
+  p.at(x, y, TAU * (0.1 + ph) + 1.6 * u, k * (0.85 + 0.25 * M.wave(u * 3, 1, ph)), function () { p.star(0, 0, r, r * 0.46, 5, { fill: c, w: 0.55, wob: 0.3 }); });
+}
+
+/* ---------------------------------------------------------------- the monkey face, for Hanuman and Sukreep
+   st: o (mouth open 0..1), dj (jaw drop), lid, look, twR, twL (ears), brow (lift), bare (teeth bared 0..1)
+   cfg: face, hatch, halo, blush, browC, nose, rim, earIn, line, crown(p), gem */
+var MFACE = [[0, 27], [16, 28], [26, 34], [31, 45], [32.5, 57], [31, 69], [26.5, 82], [17, 92], [0, 97]];
+function monkey(p, t, st, cfg) {
+  var i, o = st.o, dj = st.dj, bare = st.bare || 0, face = loop(drop(MFACE, 60, 97, dj)), h = 5 + 12 * o, w = 23 + 1.8 * bare;
+  var TOP = [[0, 71.5 - 0.6 * bare], [7, 71 - 0.6 * bare], [15, 72 - 0.4 * bare], [w - 2, 75.5], [w, 79]], BOT = [[w, 79], [w - 4, 79 + h * 0.66 + dj * 0.2], [10, 79 + h * 0.95 + dj * 0.5], [0, 79 + h + dj * 0.55]];
+  var mp = [], low = [], yb = function (dx) { return 79 + yAt([[0, h + dj * 0.55], [10, h * 0.95 + dj * 0.5], [w - 4, h * 0.66 + dj * 0.2], [w, 0]], dx); }, tk = 1 + 0.45 * bare;
+  for (i = 0; i < TOP.length; i++) mp.push([50 + TOP[i][0], TOP[i][1]]);
+  for (i = 1; i < BOT.length; i++) mp.push([50 + BOT[i][0], BOT[i][1]]);
+  for (i = BOT.length - 2; i >= 1; i--) mp.push([50 - BOT[i][0], BOT[i][1]]);
+  for (i = TOP.length - 1; i >= 1; i--) mp.push([50 - TOP[i][0], TOP[i][1]]);
+  for (i = 0; i < BOT.length; i++) low.push([50 - BOT[i][0], BOT[i][1]]);
+  for (i = BOT.length - 2; i >= 0; i--) low.push([50 + BOT[i][0], BOT[i][1]]);
+  mir(p, function (d) {            /* ears: monkey ears, a pale hollow, gold along the rim */
+    var tw = d > 0 ? st.twR : st.twL;
+    p.pivot(30, 56, tw * 0.2 + (st.earOut || 0), 1, function () {
+      p.path('M30 47 C37 46 44 43 48 37.5 C50.5 46 49.5 57 44 62.5 C40 66 35 66 31 64 Z', { fill: cfg.face, w: 1 });
+      p.path('M33 52 C38 51 42.5 48 45.4 43.5 C46 49.5 45 55 41.5 59 C38.5 61 35.5 61.5 33.6 60.5 Z', { fill: cfg.earIn, w: 0.5, alpha: 0.9 });
+      p.path('M32 48 C39 47 45 44 48 38.5', { w: 0.6, ink: 'gold', detail: true });
+    });
+    p.circle(34.5, 65.5, 1.7, { fill: 'gold', w: 0.5, detail: true });
+  });
+  p.curve(face, { close: true, fill: cfg.face, w: 1.15 });
+  if (cfg.hatch) p.clip(function () { p.curve(face, { close: true, fill: 'white' }); }, function () {
+    mir(p, function () { p.path('M32 56 C34 68 32 82 22 94 L38 100 L38 56 Z', { fill: cfg.face, line: false, hatch: 1.05 }); });
+  });
+  mir(p, function () {
+    p.ellipse(12.8, 51.5, 11, 10, { fill: cfg.halo, line: false, alpha: 0.7, rot: 0.1 });
+    if (cfg.blush) p.ellipse(25.5, 64, 4.6, 3.4, { fill: cfg.blush, line: false, alpha: 0.5, detail: true });
+    p.path('M5.4 62 C-1 66 -7 70 -8 76', { w: 0.7, ink: cfg.line || 'gold', detail: true });
+  });
+  mir(p, function (d) {            /* the brows: thick, flicked up at the outer end */
+    var b = st.brow * (d > 0 ? 1 : 0.85);
+    p.path('M2 ' + (45 - b * 0.3) + ' C6 ' + (40.5 - b) + ' 11 ' + (38.6 - b) + ' 18 ' + (38.2 - b) + ' C23 ' + (38 - b) + ' 28 ' + (38 - b * 0.7) + ' 31.5 ' + (34 - b * 0.5) + ' C30.6 ' + (40.4 - b * 0.4) + ' 27.5 ' + (44 - b * 0.3) + ' 22.5 ' + (44.2 - b * 0.3) + ' C16 ' + (43 - b * 0.6) + ' 9 ' + (43.4 - b * 0.4) + ' 2 ' + (48 - b * 0.2) + ' Z', { fill: cfg.browC, w: 0.85 });
+  });
+  gem(p, 50, 38.6, 2.1, cfg.gem || RUBY, 0);
+  p.path('M45.8 60 C45 63.5 44 65 44.4 67 C46 69 48.5 69.8 50 69.8 C51.5 69.8 54 69 55.6 67 C56 65 55 63.5 54.2 60 C52.5 58.6 47.5 58.6 45.8 60 Z', { fill: cfg.nose, w: 0.8 });
+  p.ellipse(50, 67.4, 3.6, 1.9, { fill: 'rose', w: 0.5 });
+  mir(p, function () { p.path('M2.4 66.6 C2.6 65.4 4.2 65.4 4.6 66.8 C3.6 67.4 3 67.4 2.4 66.6 Z', { fill: 'night', w: 0.3, detail: true }); });
+  p.curve(mp, { close: true, fill: MAW, w: 0.6 });
+  p.clip(function () { p.curve(mp, { close: true, fill: MAW }); }, function () {
+    p.ellipse(50, 79 + h * 0.97 + dj * 0.5, 11, 3.5 + 5 * o, { fill: 'rose', w: 0.6 });
+    p.line(50, 82 + h * 0.45, 50, 78 + h * 0.97, { w: 0.4, detail: true });
+  });
+  mir(p, function () {
+    [[2.8, 4.4, 4.6, 0], [7.4, 4.4, 4.2, 0], [12.4, 5.4, 8.6, -0.6], [17.2, 4.2, 3.4, 0], [20.6, 3.2, 2.6, 0]].forEach(function (q) { if (q[0] < w - 1) tooth(p, q[0], yAt(TOP, q[0]) + 0.1, q[1], q[2] * tk, 1, q[3]); });
+    if (o > 0.4) [[3.4, 4.4, 3.2], [8, 4.4, 3.4], [13.6, 4.6, 6.2], [18, 3.6, 3]].forEach(function (q) { tooth(p, q[0], yb(q[0]) - 0.1, q[1], q[2], -1, q[0] > 12 ? 0.5 : 0); });
+  });
+  p.curve(low, { ink: 'red', w: 1.1, wob: 0.4 });
+  p.path('M' + (50 - w) + ' 79 C' + (50 - w + 2) + ' 73.6 ' + (50 - 10) + ' 70.6 50 71.4 C' + (50 + 10) + ' 70.6 ' + (50 + w - 2) + ' 73.6 ' + (50 + w) + ' 79', { ink: 'red', w: 1.5, wob: 0.4 });
+  p.circle(50, 76.2, 1.3, { fill: 'gold', w: 0.4, detail: true });
+  eye(p, 37.2, 51.5, 7.2, { look: st.look, lid: st.lid, face: cfg.face, rim: cfg.rim, glow: st.glow });
+  eye(p, 62.8, 51.5, 7.2, { look: st.look, lid: st.lid, face: cfg.face, rim: cfg.rim, glow: st.glow });
+  cfg.crown(p);
+}
+
+/* ---------------------------------------------------------------- Hanuman */
+/* หนุมาน Hanuman, the white monkey general: bulging eyes ringed in gold, thick green brows, a jewel between them,
+   a flat nose, a gaping mouth with a jewel in the roof of it, and a small gold coronet.
+   Idle: the mouth chatters, the eyes wander and blink, an ear twitches, a jewel in the coronet glints.
+   Tap: a big yawn, eyes shut; stars and a crescent moon float out of his mouth (from the Ramakien) and rise past the crown. */
+function hanCrown(p, g) {
+  if (p.small) { p.poly(loop([[0, -4], [2.4, 8], [7, 15], [13, 21], [19, 26], [22.4, 31], [0, 32.6]]), { fill: 'gold', w: 1 }); p.dot(50, -5.4, 2.2, 'red'); gem(p, 50, 27.4, 2.8, RUBY, 0); return; }
+  p.poly(loop([[0, -4], [1.3, 2], [3.5, 9], [0, 9.6]]), { fill: 'gold', w: 0.85 });
+  p.dot(50, -5.4, 1.7, 'red');
+  mir(p, function () { flame(p, 10.4, 17.2, 1, 7); });
+  p.poly(loop([[0, 8], [5, 9.2], [9.4, 13], [11, 18], [0, 18]]), { fill: 'gold', w: 0.9 });
+  mir(p, function () { flame(p, 16.4, 24.4, 1, 8); });
+  p.poly(loop([[0, 16], [7, 17.4], [13, 20], [16.6, 25], [0, 25]]), { fill: 'gold', w: 0.9 });
+  p.curve(loop([[0, 23.5], [17, 24], [21.6, 27], [22.4, 31.4], [14, 31], [0, 32.6]]), { close: true, fill: 'gold', w: 1 });
+  p.path('M30 29 C38 30.4 44 31 50 31.2 C56 31 62 30.4 70 29', { w: 0.4, ink: 'red', detail: true });
+  [[38, 28.2, 1.4, 'green'], [62, 28.2, 1.4, 'green']].forEach(function (q) { gem(p, q[0], q[1], q[2], q[3], 0); });
+  gem(p, 50, 28, 2.3, RUBY, 0);
+  gem(p, 50, 20.8, 2, RUBY, g);
+  gem(p, 50, 13.4, 1.5, 'blue', 0);
+  p.path('M43 22.6 C46 21.4 54 21.4 57 22.6', { w: 0.4, detail: true });
+}
+D.add('hanuman', {
+  fam: 'khon', tags: ['hanuman', 'khon', 'mask', 'monkey', 'white monkey', 'ramakien', 'ramayana', 'thai dance', 'yawn', 'stars', 'moon', 'หนุมาน', 'หัวโขน', 'โขน'],
+  loop: 3, still: 0.3, ratio: 1, tapLen: 2.6, tapRest: 0.4, burst: false,
+  margin: [26, 18, 12, 18], tapMargin: [50, 46, 14, 46],
+  about: 'the mouth chatters, the eyes wander and blink, an ear twitches, a coronet jewel glints',
+  tapAbout: 'a huge yawn, eyes shut, and stars and a crescent moon float out of his mouth and rise past the crown',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), on = s.tap >= 0;
+    var yawn = on ? M.ease(M.seg(tp, 0.04, 0.27)) * (1 - M.ease(M.seg(tp, 0.66, 0.85))) : 0;
+    var st = {
+      o: M.lerp(0.34 + 0.07 * M.wave(t, 3) + 0.04 * M.wave(t, 7, 0.2), 1, yawn), dj: 7 * yawn,
+      lid: Math.max(blink(t, 0.38, 0.45), blink(t, 0.88, 0.92) * 0.8, on ? M.ease(M.seg(tp, 0.1, 0.24)) * (1 - M.ease(M.seg(tp, 0.8, 0.92))) : 0),
+      look: [0.7 * M.wave(t, 1, 0.1), 0.3 * M.wave(t, 2, 0.3)], earOut: 0.2 * yawn,
+      twR: M.bump(M.seg(t, 0.52, 0.64)) * Math.sin(TAU * 3 * M.seg(t, 0.52, 0.64)), twL: M.bump(M.seg(t, 0.56, 0.68)) * Math.sin(TAU * 3 * M.seg(t, 0.56, 0.68)),
+      brow: 1.4 * yawn + 0.5 * M.wave(t, 3, 0.4)
+    }, g = M.bump(M.seg(t, 0.72, 0.9));
+    held(p, t, 1, 0.94, function () {
+      monkey(p, t, st, { face: 'white', hatch: true, halo: 'pink', blush: 'pink', browC: 'green', nose: 'white', rim: 'gold', earIn: 'pink', crown: function () { hanCrown(p, g); } });
+    });
+    if (on) {            /* what the yawn lets out: stars, then the moon */
+      var K = [[-52, -44, 8, 'yellow'], [50, -52, 7, 'a'], [-30, -80, 6, 'a'], [32, -94, 7.5, 'yellow'], [-64, -10, 5.5, 'a'], [64, -16, 6, 'yellow']];
+      K.forEach(function (q, j) { drift(p, M.seg(tp, 0.2 + 0.05 * j, 0.8 + 0.03 * j), 50 + q[0] * 0.12, 82, 50 + q[0], 82 + q[1], q[2], q[3], j * 0.17); });
+      var u = M.seg(tp, 0.2, 0.96), k = M.easeOut(M.seg(u, 0, 0.35)) * (1 - M.easeIn(M.seg(u, 0.84, 1)));
+      if (k > 0.03) p.at(50 + 32 * M.easeOut(u) + 4 * Math.sin(u * 7), 84 - 108 * M.easeOut(u), -0.5 + 0.9 * u, 0.5 + 0.95 * k, function () { moon(p, 9, { fill: 'yellow', w: 0.9 }); p.dot(-1, 1.5, 0.8, 'gold'); });
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- Sukreep */
+/* สุครีพ Sukreep, the red monkey king: a red face, dark heavy brows, a tall peaked crown of narrowing tiers.
+   Idle: the eyes dart left and right, a sneer slowly shows his teeth, the ears flick, a glint climbs the crown.
+   Tap: he bares his teeth in a growl, brows down, and the tall crown bounces off his head three times, smaller each time. */
+function sukCrown(p, g) {
+  if (p.small) { p.poly(loop([[0, -12], [2, 0], [6, 10], [11, 18], [15, 24], [22.6, 31.6], [0, 32.8]]), { fill: 'gold', w: 1 }); p.poly(loop([[0, 26.4], [18, 27], [22.6, 31.6], [0, 32.8]]), { fill: RUBY, w: 0.8 }); p.dot(50, -13.4, 2.2, 'red'); return; }
+  var T = [[19, 15.5, 24.5, 8.5, 0.6], [14, 11, 16.2, 8.2, 0.5], [9.6, 7, 8.4, 7.4, 0.4], [5.6, 3.6, 1.6, 6.6, 0.3]], i, q;
+  p.poly(loop([[0, -12], [0.9, -8], [2.4, -4.6], [0, -4.4]]), { fill: 'gold', w: 0.8 });
+  p.dot(50, -13.4, 1.4, 'red');
+  for (i = T.length - 1; i >= 0; i--) {
+    q = T[i];
+    mir(p, function () { flame(p, q[0] - 0.4, q[2], 1, 4.6 + i * 0.4); });
+    p.poly(loop([[0, q[2] - q[3]], [q[1], q[2] - q[3]], [(q[0] + q[1]) / 2 + q[4], q[2] - q[3] / 2], [q[0], q[2]], [0, q[2]]]), { fill: 'gold', w: 0.85 });
+    p.path('M' + (50 - q[1] + 1.4) + ' ' + (q[2] - q[3] + 2.1) + ' L' + (50 + q[1] - 1.4) + ' ' + (q[2] - q[3] + 2.1), { w: 0.4, detail: true });
+    gem(p, 50, q[2] - q[3] * 0.48, 1.35 + i * 0.2, i % 2 ? 'blue' : RUBY, g * (i === 1 ? 1 : 0));
+  }
+  p.curve(loop([[0, 24.2], [17, 24.8], [21.6, 27.4], [22.6, 31.6], [14, 31.2], [0, 32.8]]), { close: true, fill: RUBY, w: 1 });
+  p.path('M29 28.4 C38 29.6 44 30.2 50 30.4 C56 30.2 62 29.6 71 28.4', { w: 0.5, ink: 'gold', detail: true });
+  [[50, 28.1, 2.1], [38, 27.8, 1.4], [62, 27.8, 1.4], [28.5, 28.4, 1], [71.5, 28.4, 1]].forEach(function (q2) { gem(p, q2[0], q2[1], q2[2], 'gold', 0); });
+}
+D.add('sukreep', {
+  fam: 'khon', tags: ['sukreep', 'sugriva', 'khon', 'mask', 'monkey king', 'red monkey', 'ramakien', 'ramayana', 'crown', 'growl', 'สุครีพ', 'หัวโขน', 'โขน'],
+  loop: 2.8, still: 0.3, ratio: 1, tapLen: 1.9, tapRest: 0.5, burst: false,
+  margin: [14, 18, 12, 18], tapMargin: [24, 24, 14, 24],
+  about: 'the eyes dart side to side, a sneer slowly shows his teeth, the ears flick, a glint climbs the tall crown',
+  tapAbout: 'he bares his teeth in a growl, brows down, and the tall crown bounces off his head three times, smaller each time',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), on = s.tap >= 0, i;
+    var gr = on ? M.ease(M.seg(tp, 0.04, 0.2)) * (1 - M.ease(M.seg(tp, 0.72, 0.92))) : 0, trem = gr * 0.35 * Math.sin(TAU * 9 * tp);
+    var sneer = M.bump(M.seg(t, 0.28, 0.52)) * 0.75, bare = Math.max(sneer, gr);
+    var u = on ? M.seg(tp, 0.14, 0.92) : 1, hop = on && u < 1 ? Math.abs(Math.sin(TAU * 1.5 * u)) * Math.exp(-3.2 * u) * 11 : 0, lx = on && u < 1 ? 0.06 * Math.sin(TAU * 3 * u) * (1 - u) : 0;
+    var st = {
+      o: M.lerp(0.3 - 0.1 * sneer + 0.03 * M.wave(t, 3), 0.55, gr), dj: 2 * gr, bare: bare,
+      lid: Math.max(blink(t, 0.66, 0.72), 0.25 * gr),
+      look: [0.9 * (M.ease(M.seg(t, 0.2, 0.26)) - 2 * M.ease(M.seg(t, 0.5, 0.56)) + M.ease(M.seg(t, 0.8, 0.86))) + trem, 0.15 * M.wave(t, 1, 0.2)],
+      twL: M.bump(M.seg(t, 0.1, 0.22)) * Math.sin(TAU * 3 * M.seg(t, 0.1, 0.22)), twR: M.bump(M.seg(t, 0.14, 0.26)) * Math.sin(TAU * 3 * M.seg(t, 0.14, 0.26)),
+      brow: 1.6 * M.bump(M.seg(t, 0.6, 0.72)) - 2.6 * gr - 0.8 * sneer, earOut: -0.1 * gr
+    }, gl = M.bump(M.seg(M.frac(t * 1 - 0.08), 0.1, 0.5));
+    held(p, t, 1, 0.9, function () {
+      p.move(trem * 1.2, 0);
+      monkey(p, t, st, { face: SUK, halo: 'yellow', blush: 'orange', browC: '#4A1410', nose: '#B3281C', rim: 'gold', earIn: 'orange', line: 'gold', gem: 'blue', crown: function () {
+        var sq = hop < 1.2 && on && u < 1 ? 1 - 0.05 * (1.2 - hop) / 1.2 : 1;
+        p.pivot(50, 32, lx, [1 / sq, sq], function () { p.move(0, -hop); sukCrown(p, gl); });
+        if (hop > 2.5) [-1, 1].forEach(function (d) { for (i = 0; i < 2; i++) p.line(50 + d * (27 + i * 3), 28 - hop * 0.2 + i * 4, 50 + d * (30 + i * 3.4), 25 - hop * 0.2 + i * 4, { w: 0.7, cap: 'round', ink: 'a' }); });
+      } });
+      if (gr > 0.5) mirSparks(p, gr);
+    });
+  }
+});
+/* the gleam on a bared canine */
+function mirSparks(p, gr) { [-1, 1].forEach(function (d) { glint(p, 50 + d * 12.6, 83.4, M.bump(M.seg(gr, 0.5, 1)) * 0.8); }); }
+
+/* ---------------------------------------------------------------- the demon face, for Tosakanth and the yak
+   st: o (snarl 0..1), dj (jaw drop), lid, look, glare (0..1), glow, pup (pupil size), nose (flare)
+   cfg: face, face2, inner, rim, iris, browC, browInk, line, ears(p, st), deco(p), crown(p), fang 'curved' | 'straight' */
+var DF = [[0, 44], [17, 45], [28, 50], [32.5, 59], [33, 69], [29.5, 81], [20.5, 91.5], [0, 97]];
+function demon(p, t, st, cfg) {
+  var i, o = st.o, dj = st.dj, g = st.glare || 0, face = loop(drop(DF, 66, 97, dj)), hh = 3.5 + 9 * o, curved = cfg.fang !== 'straight', fl = st.flare || 0;
+  var TOP = [[0, 81], [6, 79.6], [13, 81.2], [19, 80], [22.5, 76.6]], BOT = [[22.5, 76.6], [20.6, 81 + hh * 0.5 + dj * 0.15], [11, 81.6 + hh * 0.96 + dj * 0.45], [0, 81.8 + hh + dj * 0.5]];
+  var mp = [], low = [], yb = function (dx) { return yAt([[0, 81.8 + hh + dj * 0.5], [11, 81.6 + hh * 0.96 + dj * 0.45], [20.6, 81 + hh * 0.5 + dj * 0.15], [22.5, 76.6]], dx); };
+  for (i = 0; i < TOP.length; i++) mp.push([50 + TOP[i][0], TOP[i][1]]);
+  for (i = 1; i < BOT.length; i++) mp.push([50 + BOT[i][0], BOT[i][1]]);
+  for (i = BOT.length - 2; i >= 1; i--) mp.push([50 - BOT[i][0], BOT[i][1]]);
+  for (i = TOP.length - 1; i >= 1; i--) mp.push([50 - TOP[i][0], TOP[i][1]]);
+  for (i = 0; i < BOT.length; i++) low.push([50 - BOT[i][0], BOT[i][1]]);
+  for (i = BOT.length - 2; i >= 0; i--) low.push([50 + BOT[i][0], BOT[i][1]]);
+  cfg.ears(p, st);
+  p.curve(face, { close: true, fill: cfg.face, w: 1.15 });
+  cfg.deco(p, st);
+  mir(p, function () {            /* the brows: heavy, joined over the nose, lowered when he glares */
+    var b = 1.5 * g;
+    p.path('M0.4 ' + (56.8 + b) + ' C6 ' + (54.6 + b) + ' 14 ' + (51.6 + b) + ' 26.6 ' + (49 + b * 0.6) + ' C27.8 ' + (52.4 + b * 0.6) + ' 26 ' + (55.2 + b * 0.5) + ' 22.5 ' + (55.8 + b * 0.5) + ' C16 ' + (55.6 + b) + ' 9 ' + (58.8 + b) + ' 0.4 ' + (63 + b) + ' Z', { fill: cfg.browC, ink: cfg.browInk, w: 1.2 });
+  });
+  p.curve(loop([[0, 62], [3, 65], [6.8, 70], [8.4, 74.4], [5.8, 77.2], [2, 77.8], [0, 77.6]]), { close: true, fill: cfg.face2, w: 0.85 });
+  mir(p, function () { p.ellipse(4.6 + fl, 75.4, 2 + fl * 0.6, 1.3 + fl * 0.5, { fill: 'night', w: 0.3, rot: -0.35, detail: true }); });
+  p.curve(mp, { close: true, fill: MAW, w: 0.6 });
+  p.clip(function () { p.curve(mp, { close: true, fill: MAW }); }, function () { p.ellipse(50, 80.5 + hh + dj * 0.5, 9, 2 + 3 * o, { fill: 'rose', w: 0.5 }); });
+  mir(p, function () {
+    [[2.8, 3.4, 3.2], [12.6, 3.4, 3.4], [17.4, 3.2, 3]].forEach(function (q) { tooth(p, q[0], yAt(TOP, q[0]) + 0.1, q[1], q[2], 1, 0); });
+    if (o > 0.35) [[4, 3.4, 2.8], [8, 3.4, 3.2]].forEach(function (q) { tooth(p, q[0], yb(q[0]) - 0.1, q[1], q[2], -1, 0); });
+  });
+  p.curve(low, { ink: 'red', w: 1.35, wob: 0.4 });
+  p.path('M' + (50 - 22.5) + ' 76.6 C' + (50 - 20.5) + ' 80.5 ' + (50 - 17) + ' 80.6 ' + (50 - 13) + ' 81.3 C' + (50 - 8) + ' 79 ' + (50 - 4) + ' 79.4 50 81.2 C' + (50 + 4) + ' 79.4 ' + (50 + 8) + ' 79 ' + (50 + 13) + ' 81.3 C' + (50 + 17) + ' 80.6 ' + (50 + 20.5) + ' 80.5 ' + (50 + 22.5) + ' 76.6', { ink: 'red', w: 1.7, wob: 0.4 });
+  mir(p, function () {
+    var bw = curved ? 1.7 : 0.4;
+    tusk(p, 7.4, 80.4, 9.5 + 2 * st.fang, 3.8, 1, bw);
+    tusk(p, 15, yb(15) + 0.6, 11.5 + 2 * st.fang, 4, -1, curved ? 2.6 : 0.6);
+  });
+  eye(p, 37.4, 60.5, 6.4, { look: st.look, lid: st.lid, face: cfg.face, rim: cfg.rim, iris: cfg.iris, glow: st.glow, pupil: st.pup, cut: st.cut });
+  eye(p, 62.6, 60.5, 6.4, { look: st.look, lid: st.lid, face: cfg.face, rim: cfg.rim, iris: cfg.iris, glow: st.glow, pupil: st.pup, cut: st.cut });
+  cfg.crown(p, st);
+  if (cfg.fx) cfg.fx(p, st);
+}
+function earring(p, x, y, sw, ring) {
+  p.pivot(x, y, sw, 1, function () {
+    if (ring) { p.circle(x, y + 4.4, 3.6, { ink: 'gold', w: 1.6 }); p.dot(x, y + 8.4, 1.5, RUBY); }
+    else { p.line(x, y, x, y + 5.4, { w: 0.7 }); p.circle(x, y + 8, 2.8, { fill: 'gold', w: 0.7 }); p.dot(x, y + 8, 1, RUBY); }
+  });
+}
+/* a face of the crown: green, pointed under the chin, eyes that light up, a red mouth with two fangs */
+function mini(p, x, y, rx, ry, lit, c) {
+  p.at(x, y, 0, 1 + 0.2 * lit, function () {
+    p.path('M' + (-rx) + ' -0.8 C' + (-rx) + ' ' + (-ry * 1.2) + ' ' + rx + ' ' + (-ry * 1.2) + ' ' + rx + ' -0.8 C' + rx + ' ' + (ry * 0.6) + ' ' + (rx * 0.5) + ' ' + ry + ' 0 ' + ry + ' C' + (-rx * 0.5) + ' ' + ry + ' ' + (-rx) + ' ' + (ry * 0.6) + ' ' + (-rx) + ' -0.8 Z', { fill: c, w: 0.6, wob: 0.3 });
+    p.line(-rx * 0.9, -ry * 0.6, rx * 0.9, -ry * 0.6, { ink: 'gold', w: 0.6, detail: true, wob: 0.2 });
+    [-1, 1].forEach(function (d) {
+      if (lit > 0.2) p.circle(d * rx * 0.46, -ry * 0.16, 0.95 + 0.6 * lit, { fill: 'yellow', w: 0.3, glow: 0.8 * lit });
+      else p.dot(d * rx * 0.46, -ry * 0.16, 0.75, 'black');
+    });
+    p.line(-rx * 0.5, ry * 0.42, rx * 0.5, ry * 0.42, { ink: 'red', w: 1, detail: true, wob: 0.2 });
+    [-1, 1].forEach(function (d) { p.poly([[d * rx * 0.5 - 0.5, ry * 0.42], [d * rx * 0.5 + 0.5, ry * 0.42], [d * rx * 0.5, ry * 0.42 + 1.8 + lit]], { fill: 'white', w: 0.2, detail: true }); });
+  });
+}
+
+/* ---------------------------------------------------------------- Tosakanth */
+/* ทศกัณฐ์ Tosakanth, the demon king of Lanka: a deep green face with gold and blue lines, bulging eyes, bright red lips,
+   curved tusks, under a crown in tiers: a gold cap, rows of his faces, a celestial face and a spire.
+   Idle: the eyes glint and blink, the earrings swing, the faces of the crown light up one after another, bottom to top.
+   Tap: the faces wake in turn and glare, then the king himself glares: brows down, eyes blazing, tusks bared, sparks. */
+function tosCrown(p, st) {
+  var L = st.lit;
+  if (p.small) {
+    p.poly(loop([[0, -4.6], [0.9, 0], [2.8, 4.8], [0, 5.2]]), { fill: 'gold', w: 0.9 }); p.dot(50, -5.8, 2, 'red');
+    p.poly(loop([[0, 5], [5.2, 5.4], [5.8, 14.4], [0, 14.4]]), { fill: DEEP2, w: 0.9 }); p.poly(loop([[0, 15.2], [14.6, 15.6], [15.2, 25.2], [0, 25.2]]), { fill: DEEP, w: 0.9 });
+    p.poly(loop([[0, 26], [26.4, 26.4], [27, 38], [0, 38]]), { fill: DEEP, w: 0.9 });
+    p.poly(loop([[0, 24.6], [17.4, 24.8], [18, 25.8], [0, 26]]), { fill: 'gold', w: 0.8 }); p.poly(loop([[0, 14], [8, 14.2], [8.6, 15], [0, 15.2]]), { fill: 'gold', w: 0.8 });
+  } else {
+  p.poly(loop([[0, -4.6], [0.9, 0], [2.8, 4.8], [0, 5.2]]), { fill: 'gold', w: 0.8 });
+  p.dot(50, -5.8, 1.4, 'red');
+  p.poly(loop([[0, 13.6], [8, 13.8], [9.4, 15.6], [0, 15.8]]), { fill: 'gold', w: 0.7 });
+  mini(p, 50, 9.4, 3.9, 4.4, L[8], DEEP2);
+  p.poly(loop([[0, 24.2], [17, 24.4], [18.6, 26.2], [0, 26.4]]), { fill: 'gold', w: 0.75 });
+  [-1, 1].forEach(function (d, j) { mini(p, 50 + d * 10.8, 19.8, 4.2, 4.7, L[5 + (d > 0 ? 2 : 0)], DEEP); });
+  mini(p, 50, 19.8, 4.4, 4.9, L[6], DEEP);
+  p.poly(loop([[0, 35.4], [26, 35.6], [27.8, 37.2], [28.2, 38.6], [0, 38.8]]), { fill: 'gold', w: 0.85 });
+  [-2, 2, -1, 1, 0].forEach(function (k) { var a = Math.abs(k); mini(p, 50 + k * 10.6, 30.6 + a * 0.4, 4.6 - a * 0.5, 5.1 - a * 0.4, L[k + 2], DEEP); });
+  }
+  p.curve(loop([[0, 38.4], [19, 39], [27, 42.4], [31.4, 48.4], [17, 47.2], [0, 49]]), { close: true, fill: 'gold', w: 1 });
+  p.path('M20 43.2 C30 44.4 40 44.8 50 45 C60 44.8 70 44.4 80 43.2', { w: 0.45, ink: 'red', detail: true });
+  gem(p, 50, 43.4, 2.4, RUBY, st.g); gem(p, 38, 43.6, 1.6, 'blue', 0); gem(p, 62, 43.6, 1.6, 'blue', 0); gem(p, 28, 45, 1.2, 'green', 0); gem(p, 72, 45, 1.2, 'green', 0);
+}
+D.add('tosakanth', {
+  fam: 'khon', tags: ['tosakanth', 'thotsakan', 'ravana', 'demon king', 'khon', 'mask', 'ten faces', 'crown', 'yak', 'ramakien', 'ramayana', 'thai dance', 'ทศกัณฐ์', 'หัวโขน', 'โขน'],
+  loop: 3.2, still: 0.3, ratio: 1, tapLen: 2.5, tapRest: 0.6, burst: false,
+  margin: [12, 18, 8, 18], tapMargin: [16, 20, 12, 20],
+  about: 'the faces of the crown light up one after another, bottom to top; the eyes glint and blink; the earrings swing',
+  tapAbout: 'the crown faces wake one after another and glare, then Tosakanth glares: brows down, eyes ablaze with flame, tusks bared',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), on = s.tap >= 0, lit = [], i;
+    var g = on ? M.ease(M.seg(tp, 0.5, 0.64)) * (1 - M.ease(M.seg(tp, 0.84, 0.98))) : 0, shake = g * Math.sin(TAU * 11 * tp);
+    for (i = 0; i < 9; i++) lit.push(on ? M.ease(M.seg(tp, 0.04 + 0.05 * i, 0.16 + 0.05 * i)) * (1 - M.ease(M.seg(tp, 0.8 + 0.012 * i, 0.94))) : M.bump(M.seg(M.frac(t - 0.07 * i), 0, 0.15)));
+    var st = {
+      o: M.lerp(0.22 + 0.06 * M.wave(t, 2, 0.3), 0.9, g), dj: 3 * g, glare: g, glow: g, pup: 0.56 - 0.12 * g, lid: Math.max(blink(t, 0.58, 0.64), blink(t, 0.9, 0.94) * 0.7),
+      look: [0.5 * M.wave(t, 1, 0.1) * (1 - g), 0.2 * M.wave(t, 2, 0.4) * (1 - g)], flare: 0.8 * g, fang: g, lit: lit, g: M.bump(M.seg(t, 0.3, 0.5))
+    };
+    held(p, t, 1, 0.97, function () {
+      p.move(shake * 0.9, 0);
+      demon(p, t, st, {
+        face: DEEP, face2: DEEP2, rim: 'gold', iris: 'black', browC: '#0F3D29', browInk: 'gold', fang: 'curved',
+        ears: function () {
+          mir(p, function (d) {
+            p.path('M32 58 C38 58 44 53 48.5 43 C51 52.5 49.5 63 44 68 C40.5 71 36 71 33 69 Z', { fill: DEEP2, w: 1 });
+            p.path('M35 60 C39.5 60 44 56 47.2 49 C48 55.5 46.5 61.5 42.8 65.2 C40 67 37.5 67 35.6 65.8 Z', { fill: '#14452E', w: 0.5 });
+            p.path('M33 58.6 C39.5 58.4 45 54 48.4 45', { w: 0.6, ink: 'gold', detail: true });
+            earring(p, 36.5, 69.4, 0.2 * M.wave(t, 1, d > 0 ? 0.1 : 0.17), false);
+          });
+        },
+        deco: function () {
+          mir(p, function () {
+            p.ellipse(25, 66, 5.5, 8, { fill: DEEP2, line: false, alpha: 0.55, rot: 0.2 });
+            p.path('M31.4 61 C32.8 69 31 77 26 84.4', { w: 0.8, ink: 'gold', detail: true });
+            p.path('M28 63 C29 70 27 76 22.4 81', { w: 0.8, ink: 'blue', detail: true });
+            p.path('M9 49.6 C14 48 19 48.6 24 51', { w: 0.8, ink: 'blue', detail: true });
+            p.path('M11 91.6 C7 93.4 3.4 93.8 0 93.8', { w: 0.8, ink: 'blue', detail: true });
+          });
+          p.path('M50 49.4 C52.4 52 52.4 54.8 50 57.6 C47.6 54.8 47.6 52 50 49.4 Z', { fill: 'gold', w: 0.5, detail: true });
+        },
+        fx: function (q, c) {
+          if (g > 0.15) [-1, 1].forEach(function (d) {
+            [[-5, 0.66, 0.2, -3.4], [0, 1, 0, 0.6], [5, 0.74, 0.45, 3.4]].forEach(function (f) {
+              var h = g * f[1] * (17 + 3.4 * Math.sin(TAU * 4 * tp + f[2] * TAU));
+              blaze(p, 50 + d * (12.6 + f[0] * 0.8), 55, d * f[3] + 0.6 * Math.sin(TAU * 5 * tp + f[2] * TAU), h, 3.3);
+            });
+          });
+        },
+        crown: function (q, c) { tosCrown(p, c); }
+      });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- the yak */
+/* ยักษ์ yak, the demon guardian of a temple gate, here in violet: a violet face with pale lilac round the eyes, nose and mouth,
+   bulging eyes ringed in red, straight white fangs, human-style ear flaps with gold hoops, and a gold crown topped with a gourd (น้ำเต้า).
+   Idle: the eyes glare about and the brows twitch, the nostrils flare, the hoops swing, the gourd jewel glints.
+   Tap: the eyes roll round in their sockets and the fangs clack three times, each with a spark where they meet. */
+function yakCrown(p, st) {
+  if (p.small) { p.curve(loop([[0, 2.8], [3, 3.4], [5.2, 6.6], [5.4, 10.8], [4, 13.8], [3.8, 14.8], [7.8, 16.8], [9.2, 21.6], [8, 26.6], [0, 28.8]]), { close: true, fill: 'gold', w: 1 }); p.poly(loop([[0, 27], [9, 27.6], [13, 31.4], [16.8, 36.4], [27.4, 47.4], [0, 48.4]]), { fill: 'gold', w: 1 }); p.dot(50, 1.2, 2, 'red'); gem(p, 50, 42, 2.8, 'blue', 0); return; }
+  p.curve(loop([[0, 2.8], [3, 3.4], [5.2, 6.6], [5.4, 10.8], [4, 13.8], [3.8, 14.8], [7.8, 16.8], [9.2, 21.6], [8, 26.6], [0, 28.8]]), { close: true, fill: 'gold', w: 0.95 });
+  p.dot(50, 1.2, 1.5, 'red'); p.line(50, 1.4, 50, 3.2, { w: 0.6 });
+  p.path('M47.8 7 C47 10 47.4 12 48.6 13.4', { w: 0.4, detail: true }); p.path('M52.2 7 C53 10 52.6 12 51.4 13.4', { w: 0.4, detail: true });
+  gem(p, 50, 21, 2.3, RUBY, st.g);
+  p.path('M43 18.6 C46 17.4 54 17.4 57 18.6', { w: 0.4, detail: true });
+  mir(p, function () { flame(p, 8.6, 27.6, 1, 6.4); flame(p, 15.6, 36, 1, 7); });
+  p.poly(loop([[0, 27], [9, 27.6], [13, 31.4], [16.8, 36.4], [0, 36.4]]), { fill: 'gold', w: 0.9 });
+  p.curve(loop([[0, 36.8], [18, 37.4], [25, 41], [27.4, 47.4], [15, 46.6], [0, 48.4]]), { close: true, fill: 'gold', w: 1 });
+  p.path('M24 43.8 C33 45 42 45.4 50 45.6 C58 45.4 67 45 76 43.8', { w: 0.45, ink: 'red', detail: true });
+  gem(p, 50, 42, 2.4, 'blue', 0); gem(p, 37, 43, 1.6, RUBY, 0); gem(p, 63, 43, 1.6, RUBY, 0); gem(p, 27, 44.6, 1.2, 'green', 0); gem(p, 73, 44.6, 1.2, 'green', 0);
+  p.path('M36 32 C44 30.4 56 30.4 64 32', { w: 0.4, detail: true });
+}
+D.add('yak', {
+  fam: 'khon', tags: ['yak', 'yaksha', 'giant', 'demon', 'guardian', 'temple gate', 'khon', 'mask', 'violet', 'fangs', 'ramakien', 'ยักษ์', 'หัวโขน', 'โขน'],
+  loop: 2.8, still: 0.3, ratio: 1, tapLen: 2.1, tapRest: 0.5, burst: false,
+  margin: [12, 18, 10, 18], tapMargin: [14, 22, 12, 22],
+  about: 'the eyes glare about, the brows twitch, the nostrils flare, the gold hoops swing, the gourd jewel glints',
+  tapAbout: 'the eyes roll round and round and the fangs clack three times, a spark at each clack',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), on = s.tap >= 0, u = on ? M.seg(tp, 0.12, 0.76) : 0, c = on && u > 0 && u < 1 ? Math.abs(Math.sin(TAU * 1.5 * u)) : 0, roll = on ? M.ease(M.seg(tp, 0.04, 0.74)) : 0, i;
+    var st = {
+      o: on ? 0.08 + 0.9 * c : 0.22 + 0.1 * M.wave(t, 1, 0.1) + 0.05 * M.wave(t, 3), dj: on ? 4 * c : 0, glare: on ? 0.4 : 0.35 + 0.25 * M.wave(t, 1, 0.5), pup: on ? 0.42 : 0.5,
+      lid: Math.max(blink(t, 0.7, 0.76) * 0.9, 0), glow: on ? 0.55 * M.bump(M.seg(tp, 0, 0.8)) : 0, cut: on ? 0.1 : 0.42 + 0.12 * M.wave(t, 1, 0.5),
+      look: on ? [1.1 * Math.cos(TAU * 2.5 * roll), 1.1 * Math.sin(TAU * 2.5 * roll)] : [0.8 * M.wave(t, 1, 0.05) + 0.2 * M.wave(t, 3), 0.25 * M.wave(t, 2, 0.3)],
+      flare: 0.6 + 0.6 * M.wave(t, 2, 0.2) + (on ? 0.5 : 0), fang: on ? c : 0.2 * M.wave(t, 2, 0.4), g: M.bump(M.seg(t, 0.55, 0.78))
+    }, rat = on && u > 0 && u < 1 ? 0.5 * Math.sin(TAU * 1.5 * u * 2) * (1 - 0.5 * u) : 0;
+    held(p, t, 1, 0.97, function () {
+      p.move(rat * 0.5, 0);
+      demon(p, t, st, {
+        face: VIOLET, face2: VIOLET2, rim: 'red', iris: 'black', browC: '#3F2468', browInk: 'gold', fang: 'straight',
+        ears: function () {
+          mir(p, function (d) {
+            p.path('M32 56 C37.5 53 42.4 55 42.8 61 C43.2 67 40 72 35 72.6 C33 72.7 32 71.6 32 70 Z', { fill: VIOLET, w: 1 });
+            p.path('M35.4 58 C38.6 57.4 40.4 59.6 40.4 62.6 C40.4 65.6 38.6 68 36.6 68.4', { w: 0.5, detail: true });
+            p.path('M31.4 54 C35.4 52 40.4 46 44 35 C47.4 44.4 46.2 53.6 42 59.6 C39.4 56.6 35.4 55.6 31.4 56.4 Z', { fill: 'gold', w: 0.85 });
+            p.path('M35 52.8 C38.6 50 41.4 45.6 43.4 40.6', { w: 0.4, ink: 'red', detail: true });
+            earring(p, 37, 71, 0.22 * M.wave(t, 1, d > 0 ? 0.1 : 0.17) + rat * 0.3, true);
+          });
+        },
+        deco: function () {
+          mir(p, function () { p.ellipse(12.8, 60.6, 11.6, 10.6, { fill: VIOLET2, line: false, alpha: 0.75, rot: 0.1 }); });
+          p.ellipse(50, 83, 22, 9.4, { fill: VIOLET2, line: false, alpha: 0.65 });
+          mir(p, function () {
+            p.path('M31.4 62 C32.8 70 31 78 26 85', { w: 0.8, ink: 'gold', detail: true });
+            p.path('M9 49.6 C14 48 19 48.6 24 51', { w: 0.8, ink: 'gold', detail: true });
+          });
+          p.path('M50 49.4 C52.4 52 52.4 54.8 50 57.6 C47.6 54.8 47.6 52 50 49.4 Z', { fill: RUBY, w: 0.5, detail: true });
+        },
+        crown: function (q, c) { yakCrown(p, c); }
+      });
+      if (on) [0.333, 0.667, 1].forEach(function (v) {
+        var kk = M.bump(M.seg(tp, 0.12 + 0.64 * v - 0.04, 0.12 + 0.64 * v + 0.1));
+        if (kk > 0.05) [-1, 1].forEach(function (d) { p.star(50 + d * 11.6, 85.5, 2 + 6 * kk, 1 + 1.4 * kk, 4, { fill: 'yellow', w: 0.6, wob: 0.3 }); });
+      });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- the princes: Phra Ram and Phra Lak
+   A human face, serene: a closed mouth, an almond eye under a heavy lid, a fine arched brow, a jewel between the brows,
+   and the chada, a tall gold crown rising in tiers to a spire, with a gold leaf (กรรเจียก) standing at each side.
+   st: lid, look, sm (smile), kw (the leaves' swing), lit[4] (tiers lit), sheen (x of the sheen, or -1)
+   cfg: face, cheek, lip, gems [tier gem colours], band */
+var PF = [[0, 40], [13, 41], [20.5, 46], [23, 56], [22.5, 67], [18.5, 79], [11.5, 89.5], [0, 95]];
+function pEye(p, x, y, d, st, face) {
+  var lk = st.look, k = M.clamp(0.3 + 0.7 * st.lid, 0, 1), top = y - 3.9, ye = top + 7.8 * k;
+  var al = 'M' + (x - 7.2) + ' ' + (y + 0.7) + ' C' + (x - 4.2) + ' ' + (y - 3.9) + ' ' + (x + 3.8) + ' ' + (y - 4.3) + ' ' + (x + 7.4) + ' ' + (y - 1.4) + ' C' + (x + 4) + ' ' + (y + 4.1) + ' ' + (x - 3.6) + ' ' + (y + 4.1) + ' ' + (x - 7.2) + ' ' + (y + 0.7) + ' Z';
+  p.path(al, { fill: 'white', w: 0.6, wob: 0.3 });
+  p.clip(al, function () {
+    p.circle(x + lk[0] * 2.4 * d, y + 0.5 + lk[1] * 1.2, 3.5, { fill: 'black', w: 0.3, wob: 0.2 });
+    p.dot(x + lk[0] * 2.4 * d - 1, y - 0.6 + lk[1] * 1.2, 0.9, 'white');
+    p.rect(x - 9, top - 3, 18, ye - top + 3, { fill: face, line: false });
+    p.path('M' + (x - 8) + ' ' + (ye + 0.4) + ' Q' + x + ' ' + (ye + 1.8) + ' ' + (x + 8.4) + ' ' + (ye - 0.4), { w: 0.6, wob: 0.2 });
+  });
+  p.path('M' + (x - 7.6) + ' ' + (y + 0.8) + ' C' + (x - 4.2) + ' ' + (y - 4) + ' ' + (x + 3.8) + ' ' + (y - 4.5) + ' ' + (x + 7.6) + ' ' + (y - 1.5) + ' L' + (x + 10) + ' ' + (y - 3), { w: 1.3, wob: 0.3 });
+  p.path('M' + (x - 5.6) + ' ' + (y + 2) + ' C' + (x - 2) + ' ' + (y + 4.2) + ' ' + (x + 3) + ' ' + (y + 4.2) + ' ' + (x + 6) + ' ' + (y + 0.6), { w: 0.4, detail: true, alpha: 0.6 });
+}
+function chada(p, st, cfg) {
+  var L = st.lit, G = cfg.gems;
+  if (p.small) { p.poly(loop([[0, -5], [1.6, 4], [5, 14], [9.4, 24], [14, 32], [21, 40], [21.8, 43.4], [0, 44.8]]), { fill: 'gold', w: 1 }); p.dot(50, -6.2, 2, 'red'); gem(p, 50, 39.6, 2.8, G[0], 0); return; }
+  p.poly(loop([[0, -5], [0.8, 0], [2.2, 6.4], [0, 6.8]]), { fill: 'gold', w: 0.8 });
+  p.dot(50, -6.2, 1.5, 'red');
+  mir(p, function () { flame(p, 6.2, 14.8, 1, 4.2); });
+  p.poly(loop([[0, 5.8], [3.4, 6.4], [5.2, 10], [6.6, 15], [0, 15]]), { fill: 'gold', w: 0.85 });
+  gem(p, 50, 10.4, 1.3, G[3], L[3]);
+  mir(p, function () { flame(p, 10.4, 25, 1, 5.2); });
+  p.poly(loop([[0, 14.6], [5, 15.4], [8.8, 20], [10.8, 25.4], [0, 25.4]]), { fill: 'gold', w: 0.85 });
+  gem(p, 50, 20.2, 1.6, G[2], L[2]);
+  mir(p, function () { flame(p, 15.6, 35.6, 1, 6); });
+  p.poly(loop([[0, 24.8], [7, 26], [12.4, 31], [15.8, 36.2], [0, 36.2]]), { fill: 'gold', w: 0.9 });
+  gem(p, 50, 30.4, 1.9, G[1], L[1]);
+  [14.4, 24.2].forEach(function (yy, j) { p.path('M' + (50 - 9 + j * 2.6) + ' ' + yy + ' Q50 ' + (yy + 2.2) + ' ' + (50 + 9 - j * 2.6) + ' ' + yy, { w: 0.4, detail: true }); });
+  p.curve(loop([[0, 35.4], [15, 36], [20.6, 39.2], [21.8, 43.4], [14, 43.2], [0, 44.8]]), { close: true, fill: 'gold', w: 1 });
+  p.path('M29.4 40.4 C37 41.6 43.6 42.2 50 42.4 C56.4 42.2 63 41.6 70.6 40.4', { w: 0.5, ink: 'red', detail: true });
+  gem(p, 50, 40, 2.3, G[0], L[0]); gem(p, 40, 39.6, 1.4, G[2], 0); gem(p, 60, 39.6, 1.4, G[2], 0); gem(p, 31, 40.4, 1, 'white', 0); gem(p, 69, 40.4, 1, 'white', 0);
+}
+/* points along a cubic, for the spine of the ornament */
+function cub(a, b, c, d, n) {
+  var o = [], i, u, v;
+  for (i = 0; i <= n; i++) { u = i / n; v = 1 - u; o.push([v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]); }
+  return o;
+}
+/* the กรรเจียก: a gold flame-leaf rooted at the side of the crown band, behind the ear, sweeping out and up with its tip curling outward;
+   the outer edge is serrated like a kranok, a lighter inlay runs up the middle with a thin gold line round it, a ruby sits at the root.
+   It pivots at its root, a little late after the head. */
+var KSP = cub([22.6, 47], [27.2, 54], [31.4, 46.6], [31.8, 35], 12).concat(cub([31.8, 35], [32, 28.4], [33.4, 23.4], [38.6, 20], 9).slice(1));
+function kranok(p, ang, c) {
+  var sp = KSP, n = sp.length, O = [], I = [], M2 = [], i, s, a, b, d, nx, ny, w;
+  for (i = 0; i < n; i++) {
+    s = i / (n - 1); a = sp[Math.max(0, i - 1)]; b = sp[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; nx = -(b[1] - a[1]) / d; ny = (b[0] - a[0]) / d;
+    w = 2.2 * (1 - s) + 7.8 * Math.pow(Math.sin(Math.PI * Math.pow(s, 0.8)), 0.85);
+    var saw = (i % 3 === 1 && s > 0.12 && s < 0.94) ? 1.7 * Math.sin(Math.PI * s) : 0;
+    O.push([sp[i][0] + nx * (w / 2 + saw), sp[i][1] + ny * (w / 2 + saw)]); I.push([sp[i][0] - nx * w / 2, sp[i][1] - ny * w / 2]);
+    if (s > 0.12 && s < 0.9) M2.push([sp[i][0] + nx * w * 0.2, sp[i][1] + ny * w * 0.2], [sp[i][0] - nx * w * 0.2, sp[i][1] - ny * w * 0.2]);
+  }
+  p.pivot(22.6, 47, ang, 1, function () {
+    p.poly(O.concat(I.reverse()), { fill: c, w: 0.95 });
+    var inl = [], back = [];
+    for (i = 0; i < M2.length; i += 2) { inl.push(M2[i]); back.unshift(M2[i + 1]); }
+    p.poly(inl.concat(back), { fill: 'yellow', ink: 'gold', w: 0.45, detail: true });
+    gem(p, sp[2][0] + 0.8, sp[2][1] + 0.2, 1.25, RUBY, 0);
+  });
+}
+function prince(p, t, st, cfg) {
+  var face = loop(PF), sm = st.sm, c0 = 77.2 - 1.6 * sm, kg = st.kw, mw = 7.6;
+  mir(p, function (d) {
+    kranok(p, (d > 0 ? 1 : 0.86) * (0.06 * M.wave(t, 1, -0.05) + kg), cfg.leaf || 'gold');
+    var sw = 0.5 * M.wave(t, 2, d > 0 ? 0.1 : 0.2);
+    p.path('M22 54.8 C26.6 52.4 31 55.4 30.2 60.6 C29.6 65 27 68 24.2 69.2', { fill: cfg.face, close: true, w: 0.9 });
+    p.path('M25.2 58.4 C28 58.8 28.4 62 26.6 64.8', { w: 0.45, detail: true });
+    p.circle(24.6, 71.6 + sw, 2.5, { fill: 'gold', w: 0.7 }); p.dot(24.6, 71.6 + sw, 0.95, RUBY);
+  });
+  p.curve(face, { close: true, fill: cfg.face, w: 1.15 });
+  mir(p, function (d) {
+    p.ellipse(14.4, 70, 5.2, 3.8, { fill: cfg.cheek, line: false, alpha: cfg.cheekA });
+    p.path('M2.4 51 C6 47.4 13 46.6 19.8 49', { w: 1.3 });
+    p.path('M3.2 49.6 C6.4 46.4 13 45.6 19 47.4', { w: 0.4, ink: 'gold', detail: true });
+    pEye(p, 10.6, 58.6, d, st, cfg.face);
+  });
+  p.path('M50 53 C49.6 59 49.2 63.6 48.2 67.4', { w: 0.5, detail: true, alpha: 0.7 });
+  p.path('M46.2 69.6 C46.4 72 48.6 72.8 50 72.6 C51.4 72.8 53.6 72 53.8 69.6', { w: 0.8 });
+  mir(p, function () { p.dot(2.4, 71.2, 0.7, 'night'); });
+  gem(p, 50, 50.6, 1.5, RUBY, 0);
+  /* a closed mouth, the corners lifted by the smile */
+  p.path('M' + (50 - mw) + ' ' + c0 + ' C' + (50 - mw * 0.62) + ' ' + (75.8 - sm) + ' ' + (50 - 1.4) + ' ' + (75.6 - sm * 0.4) + ' 50 ' + (76.5 - sm * 0.4) + ' C' + (50 + 1.4) + ' ' + (75.6 - sm * 0.4) + ' ' + (50 + mw * 0.62) + ' ' + (75.8 - sm) + ' ' + (50 + mw) + ' ' + c0 + ' C' + (50 + 2.6) + ' ' + (c0 + 1.6 + sm * 0.8) + ' ' + (50 - 2.6) + ' ' + (c0 + 1.6 + sm * 0.8) + ' ' + (50 - mw) + ' ' + c0 + ' Z', { fill: cfg.lip, w: 0.6 });
+  p.path('M' + (50 - 5.6) + ' ' + (c0 + 0.7) + ' C' + (50 - 2.8) + ' ' + (c0 + 5 + sm * 1.2) + ' ' + (50 + 2.8) + ' ' + (c0 + 5 + sm * 1.2) + ' ' + (50 + 5.6) + ' ' + (c0 + 0.7), { fill: cfg.lip, w: 0.55 });
+  p.path('M' + (50 - mw) + ' ' + c0 + ' C' + (50 - 2.6) + ' ' + (c0 + 1.6 + sm * 0.8) + ' ' + (50 + 2.6) + ' ' + (c0 + 1.6 + sm * 0.8) + ' ' + (50 + mw) + ' ' + c0, { w: 0.55 });
+  chada(p, st, cfg);
+}
+/* ---------------------------------------------------------------- Phra Ram */
+/* พระราม Phra Ram, the green prince: a serene face under a tall gold chada, a faint smile, a jewel between the brows.
+   Idle: the gaze drifts and he blinks slowly, a glint climbs the crown tier by tier, the gold leaves sway after the head.
+   Tap: the crown shines: each tier lights in turn, rays leave the spire, sparks fly, and his smile deepens. */
+D.add('phra-ram', {
+  fam: 'khon', tags: ['phra ram', 'rama', 'ram', 'prince', 'hero', 'khon', 'mask', 'green', 'chada', 'crown', 'ramakien', 'ramayana', 'thai dance', 'พระราม', 'หัวโขน', 'โขน'],
+  loop: 3.4, still: 0.3, ratio: 1, tapLen: 2.2, tapRest: 0.5, burst: false,
+  margin: [16, 20, 8, 20], tapMargin: [56, 46, 10, 46],
+  about: 'the gaze drifts and he blinks slowly, a glint climbs the crown tier by tier, the gold leaves sway after the head',
+  tapAbout: 'the crown shines: each tier lights in turn, rays leave the spire, sparks fly, and his smile deepens',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), on = s.tap >= 0, i, lit = [];
+    var sh = on ? M.ease(M.seg(tp, 0.04, 0.2)) * (1 - M.ease(M.seg(tp, 0.7, 0.92))) : 0;
+    for (i = 0; i < 4; i++) lit.push(on ? M.bump(M.seg(tp, 0.1 + 0.11 * (3 - i), 0.46 + 0.11 * (3 - i))) * 1 : M.bump(M.seg(M.frac(t - 0.06 * (3 - i)), 0.05, 0.22)));
+    var st = {
+      lid: Math.max(blink(t, 0.46, 0.56) * 1, on ? 0.9 * M.bump(M.seg(tp, 0.2, 0.8)) : 0), look: [0.7 * M.wave(t, 1, 0.1), 0.45 + 0.1 * M.wave(t, 2)],
+      sm: 0.45 + 0.12 * M.wave(t, 1, 0.3) + 0.6 * sh, kw: 0.05 * sh * M.wave(tp, 3), lit: lit
+    }, r = on ? M.seg(tp, 0.26, 0.9) : 0;
+    held(p, t, 1, 0.98, function () {
+      p.pivot(50, 98, -0.025 * sh, 1, function () { prince(p, t, st, { face: RAMG, cheek: 'mint', cheekA: 0.6, lip: '#D6444E', gems: [RUBY, 'blue', RUBY, 'green'], leaf: 'gold' }); });
+      if (r > 0 && r < 1) for (i = 0; i < 7; i++) {
+        var a = -Math.PI / 2 + (i - 3) * 0.42, r0 = 8 + 18 * M.easeIn(M.seg(r, 0.3 + (i % 2) * 0.05, 1)), r1 = 8 + 18 * M.easeOut(M.seg(r, (i % 2) * 0.05, 0.7)), c = Math.cos(a), sn = Math.sin(a);
+        if (r1 - r0 > 0.4) p.line(50 + c * r0, 0 + sn * r0, 50 + c * r1, 0 + sn * r1, { ink: 'a', w: 1.1, cap: 'round' });
+      }
+      if (on) [[-32, -26, 7, 'yellow'], [34, -32, 6.2, 'a'], [-14, -50, 5.4, 'a'], [16, -56, 6.6, 'yellow'], [-46, -2, 5, 'a'], [48, -8, 5.4, 'yellow']].forEach(function (q, j) { drift(p, M.seg(tp, 0.3 + 0.04 * j, 0.86 + 0.02 * j), 50 + q[0] * 0.15, 6, 50 + q[0], 6 + q[1], q[2], q[3], j * 0.19); });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- Phra Lak */
+/* พระลักษมณ์ Phra Lak, the gold prince, Rama's brother: the same serene face in gold, under the same chada, with green and ruby jewels.
+   Idle: the gaze rests low and wanders, he blinks, a glint runs down the crown from the spire, the leaves sway.
+   Tap: his gold gleams: a bright sheen sweeps across the face and crown, the leaves swing out and back, and gold stars rise. */
+D.add('phra-lak', {
+  fam: 'khon', tags: ['phra lak', 'lakshmana', 'lak', 'prince', 'brother', 'khon', 'mask', 'gold', 'chada', 'crown', 'ramakien', 'ramayana', 'thai dance', 'พระลักษมณ์', 'หัวโขน', 'โขน'],
+  loop: 3, still: 0.3, ratio: 1, tapLen: 2, tapRest: 0.58, burst: false,
+  margin: [16, 24, 8, 24], tapMargin: [50, 46, 10, 46],
+  about: 'the gaze rests low and wanders, he blinks, a glint runs down the crown from the spire, the leaves sway',
+  tapAbout: 'his gold gleams: a bright sheen sweeps across face and crown, the leaves swing out and back, and gold stars rise',
+  draw: function (p, t, s) {
+    var tp = Math.max(0, s.tap), on = s.tap >= 0, i, lit = [];
+    var sh = on ? M.ease(M.seg(tp, 0.04, 0.2)) * (1 - M.ease(M.seg(tp, 0.74, 0.94))) : 0, u = on ? M.seg(tp, 0.12, 0.72) : -1, sx = -30 + 160 * M.ease(u);
+    for (i = 0; i < 4; i++) { var gy = [40, 30.4, 20.2, 10.4][i], xc = 62 - (108 - gy) * 0.367; lit.push(on ? M.bump(M.seg(sx, xc - 8, xc + 18)) : M.bump(M.seg(M.frac(t - 0.06 * i), 0.05, 0.22))); }
+    var st = {
+      lid: Math.max(blink(t, 0.7, 0.8), on ? 0.7 * M.bump(M.seg(tp, 0.25, 0.7)) : 0), look: [0.8 * M.wave(t, 1, 0.6), 0.55 + 0.1 * M.wave(t, 2, 0.2)],
+      sm: 0.4 + 0.12 * M.wave(t, 1, 0.1) + 0.55 * sh, kw: on ? 0.28 * M.spring(M.seg(tp, 0.05, 0.4)) * (1 - M.ease(M.seg(tp, 0.55, 0.9))) * Math.cos(TAU * 1.5 * M.seg(tp, 0.05, 0.9)) : 0, lit: lit
+    };
+    held(p, t, 1, 0.98, function () {
+      prince(p, t, st, { face: LAK, cheek: 'orange', cheekA: 0.32, lip: '#D6444E', gems: ['green', RUBY, 'blue', RUBY], leaf: 'gold' });
+      if (u > 0 && u < 1) {
+        var face = loop(PF);
+        p.clip(function () { p.poly(loop([[0, -6], [3, 6], [7, 15], [11, 25], [16, 36], [21.8, 44], [0, 45]]), { fill: 'gold' }); p.curve(face, { close: true, fill: 'gold' }); }, function () {
+          p.poly([[sx - 8, 108], [sx - 2, 108], [sx + 33.6, -12], [sx + 27.6, -12]], { fill: 'white', line: false, alpha: 0.92 });
+          p.poly([[sx + 8, 108], [sx + 10.4, 108], [sx + 43.4, 0], [sx + 41, 0]], { fill: 'white', line: false, alpha: 0.92 });
+        });
+      }
+      if (on) [[-42, -28, 6.8, 'yellow'], [40, -32, 7.2, 'a'], [-20, -48, 5.4, 'a'], [22, -54, 6.2, 'yellow'], [-56, 0, 5, 'a'], [56, -4, 5.4, 'yellow']].forEach(function (q, j) { drift(p, M.seg(tp, 0.34 + 0.04 * j, 0.88 + 0.02 * j), 50 + q[0] * 0.15, 20, 50 + q[0], 20 + q[1], q[2], q[3], j * 0.19); });
+    });
+  }
+});
+})(Dingbats);
+
+/* Lai (ลาย): Thai ornament in gold. Flames, four-petal rosettes, pointed petals, lotus mouldings, nagas, a gable and a niche. */
+(function (D) {
+'use strict';
+var M = D.math, TAU = M.TAU, PI = Math.PI;
+
+/* a spiral that starts on the anchor (x, y); its middle lies R away in direction a, and it winds dir (1 or -1) */
+function curl(x, y, a, dir, R, turns) {
+  var q = [], cx = x + Math.cos(a) * R, cy = y + Math.sin(a) * R;
+  for (var i = 0; i <= 36; i++) { var u = i / 36, th = a + PI + dir * u * TAU * (turns || 1.6), r = R * (1 - 0.82 * u); q.push([cx + Math.cos(th) * r, cy + Math.sin(th) * r]); }
+  return q;
+}
+function bez(a, b, c, d, n) { var q = []; for (var i = 0; i <= n; i++) { var u = i / n, v = 1 - u; q.push([v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]); } return q; }
+/* a four-point gleam at (x, y), g its size from 0 to 1 */
+function glint(p, x, y, g, r) { if (g > 0.03) p.star(x, y, (r || 10) * g, (r || 10) * 0.22 * g, 4, { fill: 'yellow', ink: 'gold', w: 0.4, glow: 1 }); }
+
+/* the spine of a kranok flame, from the origin heading up. It leans (a radians, negative leans back first), then from u0 on
+   the tip winds into a hook of T radians that tightens toward the point; sw bends the whole thing more toward the tip. */
+function spine(L, a, T, u0, sw, n) {
+  var P = [[0, 0]], H = [-PI / 2], x = 0, y = 0, i, u, h;
+  for (i = 1; i <= n; i++) {
+    u = (i - 0.5) / n;
+    h = -PI / 2 + a * Math.sin(PI * 1.5 * u) + sw * Math.pow(u, 1.4) + (u > u0 ? T * Math.pow((u - u0) / (1 - u0), 1.7) : 0);
+    x += Math.cos(h) * L / n; y += Math.sin(h) * L / n; P.push([x, y]); H.push(h);
+  }
+  return { P: P, H: H };
+}
+/* the leaf laid along a spine: a full belly low down, thinning to a point over the last two thirds */
+function leafw(u) { return u < 0.2 ? 0.55 + 0.45 * Math.sin(u / 0.2 * PI / 2) : Math.pow(1 - (u - 0.2) / 0.8, 1.8); }
+function outline(P, W, wf) {
+  var n = P.length - 1, A = [], B = [];
+  P.forEach(function (q, i) {
+    var a = P[Math.max(0, i - 1)], b = P[Math.min(n, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1, w = W * wf(i / n);
+    A.push([q[0] - dy / d * w * 1.25, q[1] + dx / d * w * 1.25]); B.push([q[0] + dy / d * w * 0.75, q[1] - dx / d * w * 0.75]);
+  });
+  return A.concat(B.reverse());
+}
+/* one flame f = {x, y, r (turn), m (mirror), L, a, T, u0, sw, W, fill, w}; returns its spine for whatever grows from it */
+function flame(p, f) {
+  var S = spine(f.L, f.a, f.T, f.u0, f.sw || 0, 30), mid = [];
+  p.at(f.x, f.y, f.r || 0, f.m ? [-1, 1] : 1, function () {
+    p.poly(outline(S.P, f.W, leafw), { fill: f.fill || 'a', w: f.w || 0.8 });
+    var o = outline(S.P, f.W * 0.55, leafw).slice(0, 31);
+    for (var i = 3; i < 22; i++) mid.push([(S.P[i][0] + o[i][0]) / 2, (S.P[i][1] + o[i][1]) / 2]);
+    p.curve(mid, { w: 0.45, detail: true });
+  });
+  return S;
+}
+/* a tap on something that opens: it winds shut over the first third, then springs open past where it began */
+function coilSpring(a) { return a < 0.3 ? 1 - M.ease(a / 0.3) : M.spring((a - 0.3) / 0.7); }
+/* the kranok flame-leaf, placed by hand. Foot at the origin, up is -y, 94 high: it leans back low down and sweeps forward to a crest whose
+   tip curls over and back like a wave. The cubic pieces (four points each) run from the foot up the smooth edge, over the crest and round
+   the curl to its point, then back down the edge that is broken into three teeth, each flicking up and forward as the tip does. */
+var KR = [
+  [[-9, -4], [-21, -20], [-19, -50], [-6, -68]], [[-6, -68], [2, -80], [13, -94], [28, -94]], [[28, -94], [39, -95], [47, -90], [46, -82]], [[46, -82], [45, -75], [41, -70], [34, -71]],
+  [[34, -71], [38, -72], [39, -77], [38, -82]], [[38, -82], [37, -86], [33, -88], [28, -88]], [[28, -88], [21, -88], [16, -81], [15, -73]],
+  [[15, -73], [15, -70], [14, -66], [13, -62]], [[13, -62], [16, -62], [20, -64], [24, -68]], [[24, -68], [23, -60], [16, -55], [11, -50]],
+  [[11, -50], [15, -51], [21, -53], [26, -57]], [[26, -57], [25, -48], [16, -42], [10, -36]],
+  [[10, -36], [15, -37], [22, -40], [28, -45]], [[28, -45], [27, -34], [18, -27], [11, -20]], [[11, -20], [11, -15], [10, -9], [9, -4]]
+];
+/* the thin line that runs inside the smooth edge and the crest, the second line of gold on gold */
+var KI = [[[-6, -12], [-14, -26], [-13, -49], [-3, -64]], [[-3, -64], [4, -75], [14, -90], [28, -91]], [[28, -91], [37, -92], [43, -88], [43, -81]], [[43, -81], [43, -77], [40, -74], [36, -74]]];
+function sample(segs, n) { var q = []; segs.forEach(function (c) { q = q.concat(bez(c[0], c[1], c[2], c[3], n).slice(0, -1)); }); q.push(segs[segs.length - 1][3]); return q; }
+var KRP = sample(KR, 8), KIP = sample(KI, 8);
+/* the points leaning by sw (radians, more toward the tip) and the curl tightening by cu */
+function lean(P, sw, cu) {
+  return P.map(function (q) {
+    var h = Math.max(0, -q[1] / 94), x = q[0], y = q[1], a = sw * Math.pow(h, 1.6), c, s;
+    if (h > 0.72) { var k = cu * (h - 0.72) / 0.28, dx = x - 38, dy = y + 80; c = Math.cos(k); s = Math.sin(k); x = 38 + dx * c - dy * s; y = -80 + dx * s + dy * c; }
+    c = Math.cos(a); s = Math.sin(a);
+    return [x * c - y * s, x * s + y * c];
+  });
+}
+/* the kranok sam tua: a tall flame with a smaller one behind and one in front, fanned a few degrees, all leaning and curling the same way,
+   standing in a cup. o = {x, y, sc, rot, t, ph (sway phase), open: [back, middle, front] (0 sunk in the cup, 1 risen), cup}; returns the tip of the tall flame */
+function samTua(p, o) {
+  var t = o.t, ph = o.ph || 0, op = o.open || [1, 1, 1], tip = [0, 0];
+  p.at(o.x, o.y, o.rot || 0, o.sc || 1, function () {
+    [[-0.17, 0.8, -2, 'a', 0, 0], [0, 1, 0, 'a', 0.06, 1], [0.13, 0.62, 4, 'yellow', 0.12, 2]].forEach(function (F) {
+      var g = op[F[5]], sw = 0.2 * M.wave(t, 1, -ph - F[4]) - 0.9 * (1 - Math.min(1, g)), cu = 0.3 * M.wave(t, 1, -ph - F[4] - 0.2);
+      if (g < 0.03) return;
+      p.at(F[2], 0, F[0], [F[1] * 0.8 * (0.6 + 0.4 * Math.min(1.1, g)), F[1] * Math.max(0.04, g)], function () {
+        p.poly(lean(KRP, sw, cu), { fill: F[3], w: 0.85 });
+        p.curve(lean(KIP, sw, cu), { w: 0.4, detail: true });
+      });
+      if (F[5] === 1) { tip = lean([[34, -71]], sw, cu)[0]; tip = [tip[0] * 0.8, tip[1]]; }
+    });
+    if (o.cup !== false) {
+      p.path('M-12 -8 C-12 0 -7 6 0 6 C7 6 12 0 12 -8 Z', { fill: 'b', w: 0.9 });
+      p.rect(-14, -12, 28, 5, { fill: 'a', r: 2.2, w: 0.85 });
+      p.circle(0, 0.5, 2.2, { fill: 'c', w: 0.6 });
+    }
+  });
+  return tip;
+}
+
+D.add('kranok', {
+  fam: 'lai', tags: ['kranok', 'flame', 'thai', 'ornament', 'motif', 'gold', 'temple', 'sam tua', 'lai thai', 'กระหนก', 'กระหนกสามตัว', 'ลายไทย'], loop: 3.6, ratio: 1, still: 0.3, tapLen: 1.8, tapRest: 0.96, burst: 'star', burstAt: [50, 18], burstN: 6, margin: [10, 12, 10, 12],
+  about: 'three nested flame-leaves in a cup sway together, the tips flicking over one after another, a glint running up the tall one', tapAbout: 'the three flames sink into their cup and spring up again one after another',
+  draw: function (p, t, s) {
+    var tp = s.tap, op = [0, 1, 2].map(function (i) { return tp >= 0 ? coilSpring(M.seg(tp, 0.08 * i, 0.08 * i + 0.8)) : 1; });
+    var tip = samTua(p, { x: 39, y: 90, sc: 0.88, t: t, open: op });
+    if (tp < 0) glint(p, 39 + tip[0] * 0.88, 90 + tip[1] * 0.88, M.bump(M.seg(M.frac(t - 0.1), 0, 0.2)), 12);
+  }
+});
+
+/* a running kranok border: nine sam tua along a wave of vine, each flame's tip curling toward the body of the next, the sway passing left
+   to right; a glint runs from tip to tip. Tap: each sinks into its cup and springs up again in turn, and gold is laid over the vine. */
+D.add('lai-kranok', {
+  fam: 'lai', tags: ['kranok', 'border', 'divider', 'flame', 'running', 'scroll', 'thai', 'gold', 'sam tua', 'กระหนก', 'ลายไทย'], loop: 4, ratio: 5, still: 0.3, tapLen: 2.4, tapRest: 0.97, burst: 'star', burstAt: [250, 40], burstN: 8, margin: [10, 8, 10, 8],
+  about: 'a row of nested flame-leaves runs along a wave of vine, each tip curling toward the next flame, the sway passing from one to the next', tapAbout: 'the flames sink into their cups and spring up again in turn, left to right, gold laid over the vine',
+  draw: function (p, t, s) {
+    var tp = s.tap, i, N = 9, X = function (i) { return 24 + 52 * i; }, vy = function (x) { return 90 - 2.8 * Math.cos(TAU * (x - 24) / 52); }, v = [];
+    for (var x = 6; x <= 494; x += 8) v.push([x, vy(x)]);
+    p.curve(v, { w: 1 });
+    if (tp >= 0) p.span(v, M.easeIn(M.seg(tp, 0.5, 0.95)), M.easeOut(M.seg(tp, 0, 0.5)), { w: 1.7, ink: 'a' });
+    p.circle(6, vy(6), 3.2, { fill: 'b', w: 0.6 }); p.circle(494, vy(494), 3.2, { fill: 'b', w: 0.6 });
+    for (i = 0; i < N; i++) {
+      var op = [0, 1, 2].map(function (k) { return tp >= 0 ? coilSpring(M.seg(tp, i * 0.06 + k * 0.03, i * 0.06 + k * 0.03 + 0.44)) : 1; });
+      var tip = samTua(p, { x: X(i), y: vy(X(i)) - 7, sc: 0.82, ph: i / N, t: t, open: op });
+      if (tp < 0) glint(p, X(i) + tip[0] * 0.82, vy(X(i)) - 7 + tip[1] * 0.82, M.bump(M.seg(M.frac(t - i / N), 0, 0.14)), 9);
+    }
+  }
+});
+
+/* a pointed petal standing on the origin, tip up: full-bellied low down, the sides drawn in to a thin point (the ogee of krajang).
+   L tall, W the half-width at the belly, bw the half-width of the foot as a share of W */
+function petalD(L, W, bw) {
+  var b = (bw || 0) * W, f = function (a, c) { return a.toFixed(2) + ' ' + c.toFixed(2); };
+  return 'M' + f(-b, 0) + ' C' + f(-W * 0.9, -L * 0.02) + ' ' + f(-W * 1.05, -L * 0.25) + ' ' + f(-W, -L * 0.42) +
+    ' C' + f(-W * 0.98, -L * 0.6) + ' ' + f(-W * 0.2, -L * 0.66) + ' ' + f(-W * 0.08, -L * 0.84) +
+    ' Q' + f(-W * 0.04, -L * 0.94) + ' ' + f(0, -L) + ' Q' + f(W * 0.04, -L * 0.94) + ' ' + f(W * 0.08, -L * 0.84) +
+    ' C' + f(W * 0.2, -L * 0.66) + ' ' + f(W * 0.98, -L * 0.6) + ' ' + f(W, -L * 0.42) +
+    ' C' + f(W * 1.05, -L * 0.25) + ' ' + f(W * 0.9, -L * 0.02) + ' ' + f(b, 0) + ' Z';
+}
+
+/* prachamyam: four pointed petals round a gem, a leaflet between each pair. o.open[i] is how far petal i is open (0 bud, 1 open,
+   a little over as it springs), o.t the loop, o.spin turns the beads of the gem */
+function rose4(p, R, o) {
+  var t = o.t, i, k;
+  for (i = 0; i < 4; i++) {
+    var od = o.open[(i + 1) % 4];
+    if (od > 0.03) p.at(0, 0, i * PI / 2 + PI / 4, [od * 0.9, od * (1 + 0.05 * M.wave(t, 1, -(i + 0.5) / 4))], function () { p.path(petalD(R * 0.8, R * 0.14), { fill: 'c', w: 0.7 }); });
+  }
+  for (i = 0; i < 4; i++) {
+    var op = o.open[i], br = 1 + 0.06 * M.wave(t, 1, -i / 4);
+    if (op > 0.03) p.at(0, 0, i * PI / 2, [Math.min(1.2, 0.35 + 0.65 * op), op * br], function () {
+      p.path(petalD(R, R * 0.31), { fill: 'a', w: 0.9 });
+      p.path(petalD(R * 0.64, R * 0.17), { fill: 'b', w: 0.45 });
+      p.line(0, -R * 0.1, 0, -R * 0.5, { w: 0.4, detail: true });
+    });
+  }
+  p.circle(0, 0, R * 0.22, { fill: 'c', w: 0.8 });
+  for (k = 0; k < 6; k++) { var a = o.spin + k * TAU / 6; p.dot(Math.cos(a) * R * 0.135, Math.sin(a) * R * 0.135, R * 0.034, 'white'); }
+}
+/* where petal i's tip is, for a glint */
+function tipOf(R, i) { return [Math.cos(i * PI / 2 - PI / 2) * R, Math.sin(i * PI / 2 - PI / 2) * R]; }
+
+D.add('prachamyam', {
+  fam: 'lai', tags: ['prachamyam', 'rosette', 'four petals', 'flower', 'thai', 'gold', 'ornament', 'lattice', 'motif', 'ประจำยาม', 'ลายไทย'], loop: 3.6, ratio: 1, still: 0.2, tapLen: 1.8, tapRest: 0.7, burst: 'petal', burstAt: [50, 50], burstN: 8, margin: [10, 10, 10, 10],
+  about: 'four petals breathe one after another round a gem, the beads of the gem turning, a glint going round the tips', tapAbout: 'the four petals close to a bud and spring open in turn, the gem spinning once',
+  draw: function (p, t, s) {
+    var tp = s.tap, op = [0, 1, 2, 3].map(function (i) { return tp >= 0 ? coilSpring(M.seg(tp, 0.08 * i, 0.08 * i + 0.7)) : 1; }), R = 45;
+    p.at(50, 50, 0, 1, function () {
+      rose4(p, R, { open: op, t: t, spin: TAU * t + (tp >= 0 ? TAU * M.easeOut(M.seg(tp, 0, 0.8)) : 0) });
+      for (var i = 0; i < 4; i++) { var q = tipOf(R, i); glint(p, q[0], q[1], M.bump(M.seg(M.frac(t - i / 4), 0, 0.18)), 11); }
+    });
+  }
+});
+
+/* a chain of prachamyam: five rosettes linked end to end by a lozenge, the breath going along it left to right */
+D.add('lai-prachamyam', {
+  fam: 'lai', tags: ['prachamyam', 'border', 'divider', 'rosette', 'chain', 'thai', 'gold', 'lattice', 'ประจำยาม', 'ลายไทย'], loop: 4, ratio: 5, still: 0.2, tapLen: 2.4, tapRest: 0.7, burst: 'petal', burstAt: [250, 50], burstN: 8, margin: [10, 10, 10, 10],
+  about: 'five four-petal rosettes linked by lozenges breathe in turn along the row, a glint passing from gem to gem', tapAbout: 'the rosettes close to buds and spring open one after another, left to right',
+  draw: function (p, t, s) {
+    var tp = s.tap, i, R = 38, lk = tp >= 0 ? M.easeOut(M.seg(tp, 0, 0.5)) : 0;
+    p.path('M7 50 L493 50', { w: 0.55 });
+    p.span('M7 50 L493 50', tp >= 0 ? M.easeIn(M.seg(tp, 0.5, 0.95)) : 0, lk, { w: 1.3, ink: 'a' });
+    for (i = 0; i < 4; i++) {
+      var lx = 100 + 100 * i, pulse = 1 + 0.2 * M.bump(M.seg(M.frac(t - (i + 0.5) / 5), 0, 0.2)), u = tp >= 0 ? M.bump(M.seg(tp, 0.1 * i + 0.1, 0.1 * i + 0.4)) : 0;
+      p.at(lx, 50, 0, pulse * (1 + 0.3 * u), function () { p.poly([[-10, 0], [0, -9], [10, 0], [0, 9]], { fill: 'a', w: 0.8 }); p.circle(0, 0, 2.8, { fill: 'b', w: 0.5 }); });
+    }
+    for (i = 0; i < 5; i++) {
+      var op = [0, 1, 2, 3].map(function (k) { return tp >= 0 ? coilSpring(M.seg(tp, 0.08 * i + 0.03 * k, 0.08 * i + 0.03 * k + 0.5)) : 1; });
+      p.at(50 + 100 * i, 50, 0, 1, function () {
+        rose4(p, R, { open: op, t: t - i / 5, spin: TAU * t * (i % 2 ? -1 : 1) });
+      });
+      glint(p, 50 + 100 * i, 50 - R, M.bump(M.seg(M.frac(t - i / 5), 0, 0.16)), 10);
+    }
+    p.dot(7, 50, 3.4, 'a'); p.dot(493, 50, 3.4, 'a'); p.circle(7, 50, 3.4, { w: 0.6 }); p.circle(493, 50, 3.4, { w: 0.6 });
+  }
+});
+
+/* lai-krajang: two ranks of krajang, the tall ones behind and the short ones tucked between, on a beaded foot. The tips lean after one
+   another along the row (shear, the foot fixed), a glint running tip to tip */
+D.add('lai-krajang', {
+  fam: 'lai', tags: ['krajang', 'border', 'divider', 'petals', 'teeth', 'gable', 'lotus base', 'thai', 'gold', 'กระจัง', 'ลายไทย'], loop: 3.6, ratio: 5, still: 0.25, tapLen: 2.2, burst: 'star', burstAt: [250, 40], burstN: 8, margin: [12, 6, 6, 6],
+  about: 'two ranks of pointed krajang petals lean after one another along a beaded foot, a glint running tip to tip', tapAbout: 'the petals spring up in turn from the left, each flashing fresh gold as it rises',
+  draw: function (p, t, s) {
+    var tp = s.tap, i, N = 12, P = 500 / N;
+    function rank(n, x0, L, W, inner, off, ph) {
+      for (var k = 0; k < n; k++) {
+        var x = x0 + P * k, pa = tp >= 0 ? M.seg(tp, k / n * 0.5 + off, k / n * 0.5 + off + 0.4) : 0, pop = 1 + 0.4 * M.bump(pa) * (1 - 0.3 * pa), fl = M.bump(M.seg(pa, 0, 0.7));
+        var lean = 0.2 * M.wave(t, 1, -(x / 500) * 1.0 - ph), up = 1 + 0.5 * (pop - 1) + 0.03 * M.wave(t, 1, -x / 500 * 2);
+        p.at(x, 90, 0, 1, function () {
+          p.skew(lean, 0);
+          p.at(0, 0, 0, [1, Math.max(0.05, up)], function () {
+            p.path(petalD(L, W, 0.95), { fill: fl > 0.3 ? 'yellow' : 'a', w: 0.9 });
+            p.path(petalD(L * 0.62, W * 0.55, 0.5), { fill: inner, w: 0.45 });
+          });
+        });
+        if (ph === 0) glint(p, x - lean * L, 90 - L * Math.max(0.05, up), M.bump(M.seg(M.frac(t - x / 500), 0, 0.12)), 9);
+      }
+    }
+    rank(N, P / 2, 80, 15.5, 'b', 0, 0);
+    p.rect(0, 89, 500, 6, { fill: 'cream', w: 0.9 });
+    rank(N - 1, P, 48, 11.5, 'c', 0.12, 0.1);
+    p.rect(0, 89, 500, 6, { fill: 'cream', w: 0.9 });
+    for (i = 0; i < N * 2; i++) p.dot(P / 4 + i * P / 2, 92, 1.7, 'a');
+    p.line(0, 97, 500, 97, { w: 0.5, detail: true });
+  }
+});
+
+/* lai-bua: the lotus moulding at the foot of a chedi. Inverted petals hang from the top rule, upright ones stand on the bottom, and a band of
+   pearls runs between them; the pearls light in turn along it */
+D.add('lai-bua', {
+  fam: 'lai', tags: ['bua', 'lotus', 'border', 'divider', 'moulding', 'chedi', 'base', 'petals', 'pearls', 'thai', 'บัวคว่ำ', 'บัวหงาย', 'ลายไทย'], loop: 3.6, ratio: 5, still: 0.3, tapLen: 2.2, burst: 'petal', burstAt: [250, 50], burstN: 8, margin: [8, 6, 8, 6],
+  about: 'lotus petals hang from the top rule and stand on the bottom one, a band of pearls between them lighting in turn', tapAbout: 'the petals close and open again, the rows in turn from the left, the pearls flashing',
+  draw: function (p, t, s) {
+    var tp = s.tap, N = 8, P = 500 / N, k, i;
+    function row(dir, y0, fill, inner) {
+      for (k = 0; k < N; k++) {
+        var x = P / 2 + P * k, br = 1 + 0.045 * M.wave(t, 1, -k / N - (dir > 0 ? 0 : 0.12)), pop = 1, shut = 0;
+        if (tp >= 0) { var o = coilSpring(M.seg(tp, k / N * 0.45 + (dir > 0 ? 0 : 0.08), k / N * 0.45 + (dir > 0 ? 0 : 0.08) + 0.5)); pop = 0.3 + 0.7 * o; shut = 0.5 * (1 - o); }
+        p.at(x, y0, 0, [1 - shut, dir * Math.max(0.05, br * pop)], function () {
+          p.path(petalD(45, 28, 0.82), { fill: fill, w: 0.9 });
+          p.path(petalD(31, 17, 0.5), { fill: inner, w: 0.45 });
+          p.line(0, -4, 0, -26, { w: 0.4, detail: true });
+        });
+      }
+    }
+    row(-1, 6, 'a', 'c');      /* hanging petals: base on the top rule, tip down */
+    row(1, 94, 'a', 'b');      /* upright petals: base on the bottom rule */
+    p.rect(0, 43.5, 500, 13, { fill: 'cream', w: 0.9 });
+    for (i = 0; i < 24; i++) {
+      var bx = 10.4 + i * 20.83, lit = M.bump(M.seg(M.frac(t - i / 24), 0, 0.12)) + (tp >= 0 ? M.bump(M.seg(tp, 0.03 * i * 0.6, 0.03 * i * 0.6 + 0.3)) : 0), sc = 1 + 0.3 * Math.min(1, lit);
+      p.at(bx, 50, 0, sc, function () { p.circle(0, 0, 4.2, { fill: lit > 0.3 ? 'yellow' : 'white', w: 0.6, glow: Math.min(1, lit) }); p.arc(-1, -1, 2, 3.6, 4.8, { w: 0.4, detail: true }); });
+    }
+    p.line(0, 6, 500, 6, { w: 1 }); p.line(0, 94, 500, 94, { w: 1 });
+    p.dot(4, 50, 3.4, 'a'); p.dot(496, 50, 3.4, 'a');
+  }
+});
+
+/* lai-naga: two nagas ripple in from either end and meet at the middle, heads close, a gem hanging between them. The ripple runs
+   toward the heads, the right one a hair behind the left. Tap: both bow, tongues flick and the gem flashes */
+function nagaPoints(t, ph) {
+  var top = [], bot = [], mid = [], N = 40, i;
+  for (i = 0; i <= N; i++) {
+    var u = i / N, x = 6 + 198 * u, A = 17 * (1 - 0.6 * Math.pow(u, 1.4)), y = 54 + A * Math.sin(TAU * (x / 99 - t - ph)), hw = 1.6 + 8.6 * Math.pow(u, 0.9);
+    mid.push([x, y, hw]);
+  }
+  mid.forEach(function (q, i) {
+    var a = mid[Math.max(0, i - 1)], b = mid[Math.min(N, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+    top.push([q[0] + dy / d * q[2], q[1] - dx / d * q[2]]); bot.push([q[0] - dy / d * q[2], q[1] + dx / d * q[2]]);
+  });
+  return { mid: mid, top: top, bot: bot };
+}
+function naga(p, t, ph, tap, k) {
+  var B = nagaPoints(t, ph), N = B.mid.length - 1, i;
+  p.poly(B.top.concat(B.bot.slice().reverse()), { fill: 'c', w: 0.95 });
+  for (i = 3; i < N - 1; i += 2) {   /* the gold crest: a flame on the back every other step */
+    var q = B.top[i], q2 = B.top[i + 1], len = 5 + 8 * i / N, hw = B.mid[i][2], lag = 0.5 * M.wave(t, 1, -i / N - ph);
+    p.poly([[q[0] - 2.5, q[1] + 1], [q[0] - 3 - len * 0.45 + lag * 1.5, q[1] - len], [q2[0] + 1, q2[1]]], { fill: 'a', w: 0.6 });
+  }
+  for (i = 4; i < N - 1; i += 2) {   /* scales: chevrons across the body pointing at the head */
+    var m = B.mid[i], tt = B.top[i], bb = B.bot[i], hw2 = m[2];
+    if (hw2 > 3) p.curve([[tt[0] - 1, tt[1]], [m[0] + hw2 * 0.55, m[1]], [bb[0] - 1, bb[1]]], { ink: 'a', w: 0.5, detail: true });
+  }
+  var h = B.mid[N], h0 = B.mid[N - 2], ang = Math.atan2(h[1] - h0[1], h[0] - h0[0]) + k.bow;
+  p.at(h[0] - 2, h[1], ang, 1.25, function () {
+    flame(p, { x: 4, y: -7, r: -0.35, m: true, L: 30, a: 0, T: 3.2, u0: 0.5, sw: -0.2 * M.wave(t, 1, -ph - 0.25), W: 5, fill: 'a' });
+    flame(p, { x: -6, y: -7, r: -0.55, m: true, L: 22, a: 0, T: 3, u0: 0.5, sw: -0.2 * M.wave(t, 1, -ph - 0.3), W: 4, fill: 'a' });
+    p.path('M-4 -9 C6 -13 19 -11 29 -5 C34 -3 34 3 29 5 C20 9 8 10 -4 9 Z', { fill: 'c', line: false });
+    p.path('M-3 -9 C6 -13 19 -11 29 -5 C34 -3 34 3 29 5 C20 9 8 10 -3 9', { w: 0.95, cap: 'round' });
+    p.path('M8 4 C16 6 25 5 31 2', { w: 0.5, detail: true });
+    p.path('M20 -6.5 C24 -7.5 28 -6 30 -4', { ink: 'a', w: 0.5, detail: true });
+    p.circle(30.5, -1.3, 1, { fill: 'ink', line: false, detail: true });
+    p.circle(14, -3.6, 3, { fill: 'white', w: 0.6 }); p.dot(14.8, -3.5, 1.3, 'ink');
+    p.poly([[-4, 9], [4, 17 + 3 * M.wave(t, 2, -ph)], [10, 9]], { fill: 'a', w: 0.6 });
+    var fl = k.tongue; if (fl > 0.05) { p.path('M32 2 L' + (32 + 8 * fl) + ' 2 M' + (32 + 6 * fl) + ' 2 L' + (32 + 10 * fl) + ' -0.5 M' + (32 + 6 * fl) + ' 2 L' + (32 + 10 * fl) + ' 4.5', { ink: 'b', w: 0.6, cap: 'round' }); }
+  });
+  return [h[0] + 38, h[1]];
+}
+D.add('lai-naga', {
+  fam: 'lai', tags: ['naga', 'border', 'divider', 'serpent', 'dragon', 'temple', 'stair', 'scales', 'gold crest', 'thai', 'นาค', 'ลายไทย'], loop: 3.6, ratio: 5, still: 0.3, tapLen: 2, burst: 'star', burstAt: [250, 44], burstN: 8, margin: [14, 6, 10, 6],
+  about: 'two scaled nagas ripple in from either end, gold crests along their backs, and meet head to head over a gem', tapAbout: 'both nagas bow, tongues flick and the gem flashes',
+  draw: function (p, t, s) {
+    var tp = s.tap, bow = tp >= 0 ? 0.32 * M.bump(M.seg(tp, 0, 0.7)) * (1 + 0.2 * M.wave(tp, 3)) : 0, tg = Math.max(0.55 + 0.45 * M.wave(t, 3), tp >= 0 ? M.bump(M.seg(tp, 0.15, 0.55)) : 0);
+    naga(p, t, 0, tp, { bow: bow, tongue: tg > 0.5 ? tg : 0 });
+    p.at(500, 0, 0, [-1, 1], function () { naga(p, t, 0.07, tp, { bow: bow, tongue: tg > 0.5 ? tg : 0 }); });
+    var gy = 50 + 3 * M.wave(t, 1) - (tp >= 0 ? 9 * M.bump(M.seg(tp, 0.1, 0.6)) : 0), fl = tp >= 0 ? M.bump(M.seg(tp, 0.1, 0.6)) : 0;
+    p.at(250, gy, 0, 1 + 0.25 * fl, function () {
+      p.path('M0 -9 C5 -4 7 0 0 7 C-7 0 -5 -4 0 -9 Z', { fill: 'b', w: 0.8, glow: 0.5 + 0.5 * fl });
+      p.line(-2.2, -1, -0.6, -5, { ink: 'white', w: 0.5, detail: true });
+    });
+    glint(p, 250, gy - 12, M.bump(M.seg(M.frac(t), 0.35, 0.55)) + fl, 9);
+  }
+});
+
+/* chofa: the finial at the peak of a temple gable, a slender neck and hooked head, and the bai raka, the row of flame-leaves
+   stepping down each slope; a bell hangs at the eave. The leaves flutter down the slope from the peak, the finial leaning with the breeze.
+   Tap: the wind takes the chofa and every leaf, and the bell swings and strikes. */
+D.add('chofa', {
+  fam: 'lai', tags: ['chofa', 'finial', 'gable', 'roof', 'temple', 'bai raka', 'bell', 'wind', 'thai', 'gold', 'ช่อฟ้า', 'ใบระกา', 'วัด'], loop: 3.2, ratio: 1, still: 0.2, tapLen: 2, burst: 'note', burstAt: [11, 88], burstN: 5, burstSpread: 3, burstColor: 'a', margin: [8, 10, 8, 10],
+  about: 'the leaves of the bai raka flutter down both slopes from the peak, the chofa leaning with the breeze, a bell swaying at the eave', tapAbout: 'a gust takes the chofa and every leaf, and the bell swings out and strikes',
+  draw: function (p, t, s) {
+    var tp = s.tap, g = tp >= 0 ? M.spring(M.seg(tp, 0, 0.4)) * (1 - M.easeIn(M.seg(tp, 0.5, 1))) : 0, i, side;
+    var AX = 50, AY = 47, EX = 9, EY = 79;
+    p.poly([[AX, AY + 7], [EX - 2, EY + 7], [100 - EX + 2, EY + 7]], { fill: 'cream', w: 0.8 });
+    p.path('M50 62 L30 78 L70 78 Z', { w: 0.45, detail: true });
+    for (side = 0; side < 2; side++) p.at(side ? 100 : 0, 0, 0, [side ? -1 : 1, 1], function () {
+      p.poly([[AX, AY], [EX, EY], [EX - 2, EY + 7], [AX, AY + 7]], { fill: 'b', w: 0.95 });
+      p.line(AX, AY + 3.5, EX - 1, EY + 3.5, { ink: 'a', w: 0.5, detail: true });
+      for (i = 0; i < 6; i++) {
+        var u = 0.1 + i * 0.165, x = AX + (EX - AX) * u, y = AY + (EY - AY) * u + 0.5, w = M.wave(t, 1, -i / 6 - (side ? 0.05 : 0)) * 0.16 + g * 0.5;
+        flame(p, { x: x, y: y, r: 0.2 + w, L: 15 + 2 * i / 5, a: 0, T: 2.4, u0: 0.5, sw: w * 0.8, W: 3.4, fill: 'a', w: 0.75 });
+      }
+      p.curve(curl(EX - 1, EY + 6, 2.6, -1, 4.5, 1.3), { w: 0.8 });
+    });
+    var sw = 0.14 * M.wave(t, 1, 0.1) + 0.8 * g, S = spine(52, 0.45, 3.3, 0.52, sw, 30);
+    p.at(AX, AY + 3, 0, 1, function () {
+      p.poly(outline(S.P, 6.2, leafw), { fill: 'a', w: 0.95 });
+      var m = []; for (i = 3; i < 22; i++) m.push(S.P[i]);
+      p.curve(m, { w: 0.45, detail: true });
+      var e = S.P[20]; p.circle(e[0] + 0.5, e[1] + 1, 2.6, { fill: 'white', w: 0.6, detail: true }); p.dot(e[0] + 1.2, e[1] + 1.2, 1.1, 'ink');
+      p.poly([[-9, 0], [-4, -6], [0, 0]], { fill: 'c', w: 0.7 }); p.poly([[0, 0], [4, -6], [9, 0]], { fill: 'c', w: 0.7 });
+    });
+    p.circle(AX, AY + 2, 4.2, { fill: 'b', w: 0.8 });
+    var sg = 0.2 * M.wave(t, 1, 0.3) + 0.9 * g * M.wave(tp < 0 ? 0 : tp, 2) , bx = EX, by = EY + 8;
+    p.line(bx, by - 1, bx, by + 3, { w: 0.6 });
+    p.pivot(bx, by, sg, 1, function () {
+      p.path('M' + (bx - 6) + ' ' + (by + 12) + ' C' + (bx - 6) + ' ' + (by + 6) + ' ' + (bx - 4) + ' ' + (by + 3) + ' ' + bx + ' ' + (by + 3) + ' C' + (bx + 4) + ' ' + (by + 3) + ' ' + (bx + 6) + ' ' + (by + 6) + ' ' + (bx + 6) + ' ' + (by + 12) + ' Z', { fill: 'a', w: 0.85 });
+      p.line(bx - 6, by + 8, bx + 6, by + 8, { w: 0.4, detail: true });
+      p.circle(bx + 1.6 * Math.sin(TAU * 2 * t), by + 14, 1.9, { fill: 'c', w: 0.6 });
+    });
+    var gl = M.seg(M.frac(t), 0.2, 0.7);
+    if (gl > 0 && gl < 1) glint(p, AX - (AX - EX) * gl, AY + (EY - AY) * gl - 8, M.bump(gl), 9);
+  }
+});
+
+/* sum: a pointed niche frame (ซุ้ม): a red band follows an ogee arch with a krajang petal at every step round the outside, the middle empty
+   for a word or a picture. The ripple runs up one side and down the other; a glint goes round. Tap: the petals fold flat and open again
+   from the foot up, the finial flashing. */
+var ARCH = (function () {
+  var P = [], i, q;
+  for (i = 0; i <= 6; i++) P.push([24, 90 - 38 * i / 6]);
+  q = bez([24, 52], [24, 30], [46, 32], [50, 11], 22); for (i = 1; i < q.length; i++) P.push(q[i]);
+  q = bez([50, 11], [54, 32], [76, 30], [76, 52], 22); for (i = 1; i < q.length; i++) P.push(q[i]);
+  for (i = 1; i <= 6; i++) P.push([76, 52 + 38 * i / 6]);
+  var L = [0]; for (i = 1; i < P.length; i++) L.push(L[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+  return { P: P, L: L, T: L[L.length - 1] };
+})();
+function archAt(u) {
+  var A = ARCH, d = u * A.T, i = 1;
+  while (i < A.P.length - 1 && A.L[i] < d) i++;
+  var a = A.P[i - 1], b = A.P[i], f = (d - A.L[i - 1]) / ((A.L[i] - A.L[i - 1]) || 1), dx = b[0] - a[0], dy = b[1] - a[1], n = Math.hypot(dx, dy) || 1;
+  return [a[0] + dx * f, a[1] + dy * f, dy / n, -dx / n];
+}
+D.add('sum', {
+  fam: 'lai', tags: ['sum', 'niche', 'frame', 'arch', 'window', 'gate', 'krajang', 'temple', 'thai', 'gold', 'ซุ้ม', 'ลายไทย'], loop: 4, ratio: 1, still: 0.3, tapLen: 2, burst: 'star', burstAt: [50, 12], burstN: 7, margin: [10, 10, 6, 10],
+  about: 'a ripple runs up one side and down the other round the petals of a gold arch, a glint going round it, the middle left empty', tapAbout: 'the petals fold flat and open again from the foot up, the finial flashing',
+  draw: function (p, t, s) {
+    var tp = s.tap, N = 19, i, out = [], inn = [];
+    ARCH.P.forEach(function (q, k) {
+      var a = ARCH.P[Math.max(0, k - 1)], b = ARCH.P[Math.min(ARCH.P.length - 1, k + 1)], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+      out.push([q[0] + dy / d * 4.2, q[1] - dx / d * 4.2]); inn.push([q[0] - dy / d * 4.2, q[1] + dx / d * 4.2]);
+    });
+    for (i = 0; i < N; i++) {
+      var u = (i + 0.5) / N, q = archAt(u), side = u < 0.5 ? u : 1 - u, wv = 1 + 0.2 * M.wave(t, 1, -side * 2), open = 1;
+      if (tp >= 0) open = coilSpring(M.seg(tp, side * 2 * 0.4, side * 2 * 0.4 + 0.55));
+      var sz = 1 + 0.25 * Math.sin(PI * u);
+      p.at(q[0] + q[2] * 4, q[1] + q[3] * 4, Math.atan2(q[3], q[2]) + PI / 2 + (1 - Math.min(1, open)) * (u < 0.5 ? 1.2 : -1.2), [Math.max(0.1, open) * sz, Math.max(0.12, open) * sz * wv], function () {
+        p.path(petalD(15, 5.6, 0.9), { fill: 'a', w: 0.8 });
+        p.path(petalD(8.5, 2.6, 0.5), { fill: i % 2 ? 'b' : 'c', w: 0.4, detail: true });
+      });
+    }
+    p.poly(out.concat(inn.slice().reverse()), { fill: 'b', w: 0.9 });
+    p.curve(inn.map(function (q) { return [q[0] + (50 - q[0]) * 0.06, q[1] + (60 - q[1]) * 0.02]; }), { ink: 'a', w: 0.45, detail: true });
+    for (i = 0; i < 9; i++) { var q2 = archAt((i + 0.5) / 9); p.dot(q2[0], q2[1], 1.5, 'a'); }
+    p.rect(14, 90, 72, 7, { fill: 'a', r: 2, w: 0.9 }); p.rect(10, 96, 80, 3, { fill: 'cream', w: 0.6, detail: true });
+    p.line(24, 90, 24, 94, { w: 0.9 }); p.line(76, 90, 76, 94, { w: 0.9 });
+    var fl = tp >= 0 ? M.bump(M.seg(tp, 0.5, 0.95)) : 0;
+    p.at(50, 14, 0.1 * M.wave(t, 1, 0.2), 1 + 0.25 * fl, function () { flame(p, { x: 0, y: 0, L: 17, a: 0, T: 0, u0: 0.9, sw: 0.25 * M.wave(t, 1, 0.3), W: 4.2, fill: 'a', w: 0.8 }); });
+    var g = M.frac(t), q3 = archAt(g);
+    glint(p, q3[0] + q3[2] * 11, q3[1] + q3[3] * 11, M.bump(M.seg(g, 0, 1)) * 0.9 + fl, 10);
+  }
+});
+
+/* kranok-corner: a corner for the top left of a box (turn or flip it for the others). Two sam tua rise from the jewel at the corner and
+   sweep along the rules, tips curling in toward the box; a glint runs out along the rules. Tap: the flames sink into their cups
+   and spring up again, the top one first. */
+D.add('kranok-corner', {
+  fam: 'lai', tags: ['kranok', 'corner', 'frame', 'border', 'box', 'flame', 'scroll', 'thai', 'gold', 'กระหนก', 'ลายไทย'], loop: 3.6, ratio: 1, still: 0.3, tapLen: 2, tapRest: 0.95, burst: 'star', burstAt: [26, 26], burstN: 6, burstSpread: 2.2, margin: [8, 8, 8, 8],
+  about: 'two nested flames sweep out from a jewel along the rules of a box, their tips curling in, a glint running out along the rules', tapAbout: 'the flames sink into their cups and spring up again, the top one first',
+  draw: function (p, t, s) {
+    var tp = s.tap, arm, lead;
+    p.path('M96 8 L8 8 L8 96', { w: 1.1, cap: 'round' });
+    p.dot(96, 8, 2.6, 'a'); p.dot(8, 96, 2.6, 'a');
+    for (arm = 0; arm < 2; arm++) {
+      p.at(0, 0, arm ? PI / 2 : 0, arm ? [1, -1] : 1, function () {
+        lead = arm ? 0.06 : 0;
+        var op = [0, 1, 2].map(function (k) { return tp >= 0 ? coilSpring(M.seg(tp, arm * 0.1 + k * 0.05, arm * 0.1 + k * 0.05 + 0.65)) : 1; });
+        samTua(p, { x: 28, y: 28, rot: PI / 2, sc: 0.74, ph: lead, t: t, open: op });
+        var hg = 1.2 * M.seg(t - lead, 0.02, 0.6), hd = Math.min(1, hg), tl = Math.max(0, hg - 0.2);
+        p.span('M8 8 L96 8', tl, hd, { w: 1.5, ink: 'a', cap: 'round' });
+      });
+    }
+    p.circle(15, 15, 8.4, { fill: 'b', w: 0.9 }); p.circle(15, 15, 4.4, { fill: 'a', w: 0.6 }); p.circle(15, 15, 1.7, { fill: 'white', line: false });
+  }
+});
+})(Dingbats);
+
+/* Thai: the nagas of the stair and the river, the unalom yant, and the Asian elephant, chang, in its poses. */
+(function (D) {
+'use strict';
+var M = D.math, TAU = M.TAU;
+
+/* ---------------------------------------------------------------- helpers */
+/* points along a cubic, for spines of things that bend: nagas, trunks, tails */
+function bez(a, b, c, d, n) {
+  var o = [], i, u, v;
+  for (i = 0; i <= n; i++) { u = i / n; v = 1 - u; o.push([v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]); }
+  return o;
+}
+/* a smooth line through hand-placed points, per samples to each span */
+function cr(pts, per) {
+  var out = [], n = pts.length, i, k, a, b, c, d, u, u2, u3;
+  for (i = 0; i < n - 1; i++) {
+    a = pts[Math.max(0, i - 1)]; b = pts[i]; c = pts[i + 1]; d = pts[Math.min(n - 1, i + 2)];
+    for (k = 0; k < per; k++) {
+      u = k / per; u2 = u * u; u3 = u2 * u;
+      out.push([0.5 * (2 * b[0] + (c[0] - a[0]) * u + (2 * a[0] - 5 * b[0] + 4 * c[0] - d[0]) * u2 + (3 * b[0] - a[0] - 3 * c[0] + d[0]) * u3),
+                0.5 * (2 * b[1] + (c[1] - a[1]) * u + (2 * a[1] - 5 * b[1] + 4 * c[1] - d[1]) * u2 + (3 * b[1] - a[1] - 3 * c[1] + d[1]) * u3)]);
+    }
+  }
+  out.push([pts[n - 1][0], pts[n - 1][1]]);
+  return out;
+}
+/* points as path data */
+function pl(a) { var s = 'M' + a[0][0].toFixed(2) + ' ' + a[0][1].toFixed(2), i; for (i = 1; i < a.length; i++) s += 'L' + a[i][0].toFixed(2) + ' ' + a[i][1].toFixed(2); return s; }
+function mix(a, b, u) { return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; }
+/* a wavy line of points, the wave sliding along as ph runs 0 → 1 */
+function sinew(x0, x1, y, amp, lam, ph) { var a = [], x; for (x = x0; x <= x1 + 0.1; x += 4) a.push([x, y + amp * Math.sin(TAU * ((x - x0) / lam - ph))]); return a; }
+/* a closed ribbon along a spine, w(s) wide at s in 0..1, the far end rounded */
+function tube(p, sp, w, o) {
+  var n = sp.length, L = [], R = [], i, a, b, d, h, e, a0, k;
+  for (i = 0; i < n; i++) {
+    a = sp[Math.max(0, i - 1)]; b = sp[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; h = w(i / (n - 1)) / 2;
+    L.push([sp[i][0] - (b[1] - a[1]) / d * h, sp[i][1] + (b[0] - a[0]) / d * h]); R.unshift([sp[i][0] + (b[1] - a[1]) / d * h, sp[i][1] - (b[0] - a[0]) / d * h]);
+  }
+  e = sp[n - 1]; h = w(1) / 2; a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+  for (k = 1; k < 6; k++) L.push([e[0] + Math.cos(a0 - Math.PI * k / 6) * h, e[1] + Math.sin(a0 - Math.PI * k / 6) * h]);
+  return p.poly(L.concat(R), o);
+}
+/* a column along a spine, wf(u) wide at u in 0..1: the fill with no line, then the outline as one open stroke
+   that leaves the root open, so a leg or a trunk grows out of what it is drawn over and does not sit on it.
+   end 'round' (a trunk, a tail), 'flat' (a foot: a broad sole with softened corners), 'none'; o.fill, o.w.
+   Returns the two edges. */
+function column(p, sp, wf, o) {
+  var n = sp.length, L = [], R = [], i, a, b, d, h, nx, ny, cap = [], k, e, a0, fd, end = o.end || 'round', f = o.fill, edge;
+  for (i = 0; i < n; i++) {
+    a = sp[Math.max(0, i - 1)]; b = sp[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; h = wf(i / (n - 1)) / 2;
+    nx = -(b[1] - a[1]) / d; ny = (b[0] - a[0]) / d;
+    L.push([sp[i][0] + nx * h, sp[i][1] + ny * h]); R.push([sp[i][0] - nx * h, sp[i][1] - ny * h]);
+  }
+  e = sp[n - 1];
+  if (end === 'round') {
+    h = wf(1) / 2; a0 = Math.atan2(L[n - 1][1] - e[1], L[n - 1][0] - e[0]);
+    for (k = 1; k < 6; k++) cap.push([e[0] + Math.cos(a0 - Math.PI * k / 6) * h, e[1] + Math.sin(a0 - Math.PI * k / 6) * h]);
+  } else if (end === 'flat') {
+    a = sp[n - 2]; d = Math.hypot(e[0] - a[0], e[1] - a[1]) || 1; fd = [(e[0] - a[0]) / d, (e[1] - a[1]) / d];
+    [[0.13, 0.55], [0.5, 0.95], [0.87, 0.55]].forEach(function (q) { var m = mix(L[n - 1], R[n - 1], q[0] === 0.5 ? 0.5 : q[0]); cap.push([m[0] + fd[0] * q[1] * (o.sole == null ? 1 : o.sole), m[1] + fd[1] * q[1] * (o.sole == null ? 1 : o.sole)]); });
+  }
+  edge = L.concat(cap, R.slice().reverse());
+  if (f) p.path(pl(edge) + 'Z', { fill: f, line: false });
+  if (o.w !== 0) p.path(pl(edge), { w: o.w == null ? 0.95 : o.w, wob: o.wob == null ? 1 : o.wob });
+  return { L: L, R: R, sp: sp };
+}
+/* two-bone leg: the knee between a hip and an ankle for thigh a and shin b; bend +1 puts it forward (right), -1 back */
+function knee(h, k, a, b, bend) {
+  var dx = k[0] - h[0], dy = k[1] - h[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, x, hh;
+  if (d >= a + b - 0.05) return [h[0] + ux * a * (d / (a + b)), h[1] + uy * a * (d / (a + b))];
+  x = (a * a - b * b + d * d) / (2 * d); hh = Math.sqrt(Math.max(0, a * a - x * x));
+  return [h[0] + ux * x + uy * hh * bend, h[1] + uy * x - ux * hh * bend];
+}
+
+/* ---------------------------------------------------------------- chang, the elephant
+   One animal for every pose. Everything is drawn in the standing elephant's own coordinates (facing right,
+   feet on y = 90, shoulder at y = 34): the body, a head on its neck, the trunk and ear and tail on the head and
+   rump, four legs. A pose moves them: the body shifts and tilts (bx by bt), the head nods about the neck (ha, hd),
+   each leg is a hip on the body and an ankle in the box, the trunk is a line through points.
+   An Asian elephant: a domed head with two bumps, small round ears, a back that arches in the middle, one
+   finger at the trunk's tip, five toenails on the front feet and four behind, a tail with a tuft. */
+var G = 90, GREY = 'grey', DARK = '#8E949C', NAIL = 'cream', PX = 52, PY = 52, NX = 79, NY = 48;
+var BODY = 'M71 37 C62 31 46 29.5 36 33 C27 36.5 21 43 21.5 51 C22 59 28 64 37 63.5 C47 65.5 58 65.5 68 63.5 C77 62 82 55 80.5 46 C79.5 41 76 38.5 71 37 Z';
+var HEAD = 'M77.5 41 C76.5 32 82 26 89.5 26 C93 26 95.5 27.5 97 30 C99.5 34 100 41 99 47 C98.5 50 97.5 53 96 56 C92 60.5 84.5 59.5 81 55 C78.5 51.5 77.8 46 77.5 41 Z';
+var EAR = 'M80 33.5 C74 29.5 66 33 65 41 C64 48 67.5 54 73 54.5 C77 54 78 50 78.5 46 C79.3 41 80 37.5 80 33.5 Z';
+
+/* body-local standing coordinates to the box, given the body's shift and tilt */
+function fromBody(o, x, y) {
+  var c = Math.cos(o.bt || 0), s = Math.sin(o.bt || 0), dx = x - PX, dy = y - PY;
+  return [PX + dx * c - dy * s + (o.bx || 0), PY + dx * s + dy * c + (o.by || 0)];
+}
+/* one leg. l: hip (body-local), ank (box), fa the foot's angle (0 straight down, + toes forward), len (the leg's length
+   hip to ankle when straight), knee (to override the two-bone knee), sp (the spine in box points, to override all of it:
+   a folded leg), far, w0 w1 */
+function chLeg(p, o, l) {
+  var fa = l.fa || 0, fl = l.fl == null ? 4.6 : l.fl, fd = [Math.sin(fa), Math.cos(fa)], a, h, k, sp, end, w0 = l.w0 || 14, w1 = l.w1 || 10.6;
+  if (l.sp) { a = l.sp[l.sp.length - 1]; end = [a[0] + fd[0] * fl, a[1] + fd[1] * fl]; sp = l.sp.concat([end]); }
+  else { h = fromBody(o, l.hip[0], l.hip[1]); a = l.ank; k = l.knee || knee(h, a, (l.len || 30) / 2, (l.len || 30) / 2, l.bend == null ? 1 : l.bend); end = [a[0] + fd[0] * fl, a[1] + fd[1] * fl]; sp = cr([h, k, a, end], 7); }
+  var ls = sp.length, col = column(p, sp, function (u) { return u > 0.88 ? w1 + 1.7 * (u - 0.88) / 0.12 : w0 + (w1 - w0) * Math.pow(u / 0.88, 0.8); }, { end: 'flat', fill: l.far ? DARK : (o.fill || GREY), w: 0.95 });
+  var nn = l.nails == null ? 3 : l.nails;
+  if (!p.small && nn) {
+    var q = col.R[ls - 1], r = col.L[ls - 1], m, j;
+    for (j = 0; j < nn; j++) { m = mix(q, r, 0.1 + j * 0.21); p.at(m[0] + fd[0] * 0.3, m[1] + fd[1] * 0.3, fa, 1, function () { p.path('M-1.5 0.1 C-1.5 -1.6 1.5 -1.6 1.5 0.1 C1.2 1 -1.2 1 -1.5 0.1 Z', { fill: NAIL, w: 0.35 }); }); }
+  }
+}
+/* a point in the head's own coordinates, in the box */
+function headPt(o, x, y) {
+  var c = Math.cos(o.ha || 0), s = Math.sin(o.ha || 0), k = o.hk || 1, dx = x + (o.hx || 0) - NX, dy = y + (o.hy || 0) - NY;
+  return fromBody(o, NX + (dx * c - dy * s) * k, NY + (dx * s + dy * c) * k);
+}
+/* the same spine of points a second time, resampled to n points evenly along it, for blending one pose of a leg into another */
+function even(sp, n) {
+  var d = [0], i, L, out = [], k, j = 0, u, f;
+  for (i = 1; i < sp.length; i++) d.push(d[i - 1] + Math.hypot(sp[i][0] - sp[i - 1][0], sp[i][1] - sp[i - 1][1]));
+  L = d[sp.length - 1] || 1;
+  for (k = 0; k < n; k++) { u = L * k / (n - 1); while (j < sp.length - 2 && d[j + 1] < u) j++; f = (u - d[j]) / ((d[j + 1] - d[j]) || 1); out.push([sp[j][0] + (sp[j + 1][0] - sp[j][0]) * f, sp[j][1] + (sp[j + 1][1] - sp[j][1]) * f]); }
+  return out;
+}
+function blend(a, b, u) { return a.map(function (q, i) { return [q[0] + (b[i][0] - q[0]) * u, q[1] + (b[i][1] - q[1]) * u]; }); }
+function chHead(p, o) {
+  var eye = o.eye || 0, mo = o.mouth || 0, ea = o.earA || 0, sx = o.ear == null ? 1 : o.ear, ek = o.earK || 1, ey = o.earY || 0, tr = o.trunk, fill = o.fill || GREY, k, u, er = o.eyeK || 1;
+  /* the far ear shows a sliver behind the near one, darker */
+  if (sx > 0) p.pivot(80, 36, -0.1 + ea * 0.5, [Math.max(0.3, sx * 0.85) * ek, ek], function () { p.path(EAR, { fill: DARK, w: 0.8 }); });
+  p.path(HEAD, { fill: fill, w: 1 });
+  /* the two domes of the forehead, the dip between them */
+  p.path('M88 27.4 C89.4 29.6 89.4 31.6 88.2 33.4', { w: 0.45, detail: true });
+  if (o.tuft) { p.path('M84.6 26.6 C83.6 24 83 22.4 82 21.6', { w: 0.5, ink: 'brown' }); p.path('M87.4 25.8 C87.4 23 87.2 21 86.6 19.6', { w: 0.5, ink: 'brown' }); p.path('M90.4 25.8 C91 23.4 92 21.8 93.2 21', { w: 0.5, ink: 'brown' }); p.path('M93 27 C94.4 25.4 95.8 24.6 97.2 24.4', { w: 0.5, ink: 'brown' }); p.path('M82 28.6 C80.4 26.6 79 26 77.6 26', { w: 0.45, ink: 'brown' }); }
+  /* the trunk grows from the face */
+  if (tr) {
+    var sp = cr(tr, 5), n = sp.length, rw = o.trunkW || 10.4, tw = o.tipW || 3.4, wf = function (v) { return tw + (rw - tw) * Math.pow(1 - v, 0.85); };
+    var cl = column(p, sp, wf, { end: 'round', fill: fill, w: 1 });
+    if (!p.small) {
+      for (k = 3; k < n - 3; k += 3) { u = k / (n - 1); var a = cl.L[k], b = cl.R[k]; p.line(a[0] * 0.78 + b[0] * 0.22, a[1] * 0.78 + b[1] * 0.22, a[0] * 0.28 + b[0] * 0.72, a[1] * 0.28 + b[1] * 0.72, { w: 0.35, detail: true }); }
+      var e = sp[n - 1], f = sp[n - 3]; p.dot(e[0] * 0.8 + f[0] * 0.2, e[1] * 0.8 + f[1] * 0.2, 0.7, 'ink');
+    }
+  }
+  if (o.tusk !== false) p.path('M94.6 54.2 C97.6 60.2 104.2 60.4 106.8 54.2 C103 57.4 99.6 56.8 98.2 52.4 Z', { fill: 'white', w: 0.65 });
+  /* the mouth, shut as a small smile under the trunk, or open to trumpet */
+  if (mo > 0.05) p.path('M93 57.5 C96.5 56.5 99 58 98.6 61 C97 64.5 91.5 65 88.5 62 C88 60 90 58.4 93 57.5 Z', { fill: 'rose', w: 0.7 }); else p.path('M93.6 57.4 C91.4 58.2 88.6 57.6 86.6 55.4', { w: 0.55, detail: true });
+  /* the eye: a small dark one, set low on the face under a heavy brow, with its lashes; shut it is a curve; between, a lid comes down */
+  var eyeAt = function () {
+    if (eye > 0.92) { p.path('M87.8 40.4 C89.4 42.6 92.4 42.6 94 40.2', { w: 0.8 }); if (!p.small) { p.line(88, 40.9, 86.6, 42.3, { w: 0.4 }); p.line(93.9, 40.7, 95.1, 42.1, { w: 0.4 }); } return; }
+    p.dot(91, 40.6, 1.55 * er, 'ink');
+    if (!p.small) p.dot(91.5 + 0.2 * er, 40.1 - 0.2 * er, 0.45 * er, 'white');
+    if (eye > 0.05) { var yl = 38.4 + 4.4 * eye; p.path('M87.4 ' + yl + ' C89.4 ' + (yl - 1.2) + ' 93 ' + (yl - 1.2) + ' 94.8 ' + yl + ' L94.8 36 L87.4 36 Z', { fill: fill, line: false }); p.path('M87.6 ' + yl + ' C89.6 ' + (yl + 0.9) + ' 92.6 ' + (yl + 0.9) + ' 94.6 ' + yl, { w: 0.6 }); }
+    if (!p.small) p.path('M87.6 38.4 C89.4 36.7 93 36.8 94.6 38.8', { w: 0.45 });
+  };
+  /* the near ear: small and round, hinged along the back of the head, its rim turned over; thrown forward (a negative width) it covers the face */
+  var earAt = function () {
+    p.pivot(80, 36, ea * 0.6, [sx * ek, ek], function () {
+      p.move(0, ey / ek);
+      p.path(EAR, { fill: fill, w: 0.95 });
+      p.path('M79.4 36 C74.6 33 68.4 36 67.6 42.4', { w: 0.45, detail: true });
+      p.path('M74 50 C71.6 48 70.4 45 70.6 43', { w: 0.35, detail: true, ink: DARK });
+      if (sx < 0) p.path('M72 43 C74 46 74 50 72 52', { w: 0.4, detail: true, ink: 'rose' });
+    });
+  };
+  if (o.eyeOver) { earAt(); eyeAt(); } else { eyeAt(); earAt(); }
+}
+/* the whole animal. o: bx by bt (body), hx hy ha hk (head offset, angle, scale about the neck), ear earA, eye mouth, trunk, tail (swing),
+   legs (list of chLeg specs), tusk */
+function chang(p, o) {
+  var legs = o.legs || [], i, tl = o.tail || 0, fill = o.fill || GREY;
+  /* the tail hangs from the rump behind everything */
+  if (o.tailBox) {
+    var tb = cr(o.tailBox, 5), te = tb[tb.length - 1], tf = tb[tb.length - 3];
+    column(p, tb, function (u) { return 3.4 - 1.5 * u; }, { end: 'round', fill: fill, w: 0.8 });
+    p.at(te[0], te[1], Math.atan2(te[1] - tf[1], te[0] - tf[0]) - Math.PI / 2, 1, function () { p.path('M-2.4 -1 C-3.6 2.4 -2.8 6 0 8.6 C2.8 6 3.6 2.4 2.4 -1 Z', { fill: 'black', w: 0.5 }); });
+  }
+  p.push(); p.move(o.bx || 0, o.by || 0);
+  p.pivot(PX, PY, o.bt || 0, 1, function () {
+    if (!o.tailBox) p.pivot(22, 47, tl, 1, function () {
+      var sp = cr([[22, 46], [15, 55], [14.5, 65], [17, 74]], 5);
+      column(p, sp, function (u) { return 3.4 - 1.5 * u; }, { end: 'round', fill: fill, w: 0.8 });
+      p.path('M15.6 72 C13 75.4 13.8 79.6 16.4 82 C19.2 79.6 20 75.4 18.4 72 Z', { fill: 'black', w: 0.5 });
+    });
+  });
+  p.pop();
+  legs.forEach(function (l) { if (l.far) chLeg(p, o, l); });
+  p.push(); p.move(o.bx || 0, o.by || 0);
+  p.pivot(PX, PY, o.bt || 0, 1, function () {
+    p.path(BODY, { fill: fill, w: 1 });
+    if (!p.small) {
+      p.path('M28 44 C25 52 26 60 32 64', { w: 0.4, detail: true, ink: DARK });
+      p.path('M60 46 C64 52 66 58 65 64', { w: 0.4, detail: true, ink: DARK });
+      p.path('M43 36.6 C45 37.4 47 37.4 49 36.6', { w: 0.35, detail: true, ink: DARK });
+    }
+  });
+  p.pop();
+  legs.forEach(function (l) { if (!l.far) chLeg(p, o, l); });
+  p.push(); p.move(o.bx || 0, o.by || 0);
+  p.pivot(PX, PY, o.bt || 0, 1, function () {
+    p.pivot(NX, NY, o.ha || 0, o.hk || 1, function () { p.move(o.hx || 0, o.hy || 0); chHead(p, o); });
+  });
+  p.pop();
+}
+
+/* ---------------------------------------------------------------- chang-walk */
+/* a trunk hanging from the face, swinging; sw is the sway, ph its lag along the length */
+function hang(sw, bend) { return [[96, 48], [102 + 2 * sw, 58], [103 + 5 * sw + (bend || 0), 71], [101 + 8 * sw + (bend || 0) * 1.6, 83]]; }
+
+D.add('chang-walk', {
+  fam: 'thai', tapRest: 0.45, tags: ['elephant', 'chang', 'walk', 'amble', 'sanctuary', 'trunk', 'animal', 'thailand', 'chiang mai', 'ช้าง', 'เดิน'], loop: 2.8, still: 0.1, ratio: 1.2, tapLen: 2, burst: false, tapMargin: [30, 20, 10, 20],
+  margin: [22, 14, 12, 18], about: 'a slow, heavy walk in the elephant\'s own gait: each hind foot then the fore foot on its side; the body bobs, the head nods, the trunk and tail swing after',
+  tapAbout: 'it stops, lifts its trunk to look at you and trumpets, then ambles on',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, duty = 0.7, A = 8.4, q = s.tap, stop = 0, lift = 0, i;
+    if (q >= 0) { stop = ez(seg(q, 0, 0.18)) * (1 - ez(seg(q, 0.8, 1))); lift = ez(seg(q, 0.12, 0.3)) * (1 - ez(seg(q, 0.74, 0.9))); }
+    var go = 1 - stop, bob = 0.8 * M.wave(t, 4, 0.12) * go - 0.4 * stop, sw = M.wave(t, 1, 0.1), sway = (M.wave(t, 1, 0) - 0) * go;
+    var spec = [[31, 0, false, 33], [68, 0.25, false, 32], [38, 0.5, true, 33], [60, 0.75, true, 32]];
+    var legs = spec.map(function (c, j) {
+      var u = M.frac(t - c[1]), st = u < duty, v = st ? 0 : (u - duty) / (1 - duty), x, lf, fa;
+      if (st) x = A - 2 * A * (u / duty); else x = -A + 2 * A * ez(v);
+      lf = st ? 0 : 7 * M.bump(v); fa = st ? 0 : (-0.5 + 0.9 * v) * Math.pow(M.bump(v), 0.6);
+      x *= go; lf *= go; fa *= go;
+      return { hip: [c[0], 54], ank: [c[0] + x + (j < 2 ? 0 : 0), G - 4.6 - lf], fa: fa, len: c[3], far: c[2], w0: 14.5 };
+    });
+    /* the ground slides back at the foot's pace; its marks shrink at the edges */
+    if (!p.small) for (i = 0; i < 6; i++) {
+      var gx = ((i * 24 - 24 * t * go) % 144 + 144) % 144 - 12, e = Math.min(M.seg(gx, -10, 6), M.seg(132, gx, 112));
+      if (e > 0.02) p.line(gx - 4 * e, G + 3.4 + (i % 2) * 2.4, gx + 4 * e, G + 3.4 + (i % 2) * 2.4, { w: 0.5, ink: 'brown', cap: 'round' });
+    }
+    p.ellipse(56, G + 1, 44, 3, { fill: 'smoke', line: false, alpha: 0.5 });
+    var trk = hang(sw * 0.9 * go, 0).map(function (pt, j) { return j === 0 ? pt : [M.lerp(pt[0], [100, 106, 112, 114][j] , lift), M.lerp(pt[1], [48, 36, 22, 12][j], lift)]; });
+    var wo = { bx: 0, by: bob, bt: 0.012 * M.wave(t, 2, 0.2) * go - 0.02 * lift, legs: legs, ha: 0.03 * M.wave(t, 2, 0.05) * go - 0.06 * lift, hy: 0, ear: 0.82 + 0.16 * M.wave(t, 2, 0.15) - 0.25 * lift, earA: 0.1 * M.wave(t, 2, 0.15), trunk: trk, tail: 0.18 * M.wave(t, 1, 0.3) + 0.06 * M.wave(t, 3), mouth: lift > 0.5 ? lift : 0, eye: M.bump(seg(t, 0.52, 0.56)) };
+    chang(p, wo);
+    if (q >= 0 && !p.small) { var wt = headPt(wo, trk[3][0], trk[3][1]), wv = seg(q, 0.24, 0.74); if (wv > 0 && wv < 1) sound(p, wt[0] + 2, wt[1] + 1, wv, true); }
+  }
+});
+/* ---------------------------------------------------------------- chang-calf */
+/* the calf is the same animal drawn smaller and rounder: a bigger head and ears, a short trunk, legs set low and thick, a tuft of
+   bristles on the forehead, no tusks. It walks in quick small steps, its trunk a noodle it cannot yet steer. */
+function stub(pts, k) { var r = pts[0]; return pts.map(function (q, i) { return i ? [r[0] + (q[0] - r[0]) * k, r[1] + (q[1] - r[1]) * k] : q; }); }
+D.add('chang-calf', {
+  fam: 'thai', tapRest: 0.45, tags: ['elephant', 'calf', 'baby', 'chang', 'chang noi', 'trunk', 'trip', 'cute', 'animal', 'thailand', 'ลูกช้าง', 'ช้าง'], loop: 2.4, still: 0.2, ratio: 1.2, tapLen: 2.2, burst: 'heart', burstAt: [92, 34], burstN: 4, burstSpread: 2.4, burstDelay: 0.62,
+  margin: [24, 14, 12, 14], about: 'a baby elephant pitter-patters along, its short trunk wobbling like a noodle; it steps on the tip of it, lurches forward, and catches itself',
+  tapAbout: 'it flips both big ears over its face and peeks out over them, then flaps them back with a squeak',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, K = 0.8, duty = 0.62, A = 9, q = s.tap, i;
+    /* the trip: the trunk drops, a front foot comes down on its tip, the head is pulled down, the body lurches, it springs free */
+    var drop = ez(seg(t, 0.46, 0.58)) * (1 - ez(seg(t, 0.74, 0.8))), lurch = ez(seg(t, 0.6, 0.7)) * (1 - ez(seg(t, 0.7, 0.8))), recov = M.spring(seg(t, 0.8, 0.98)) - 1;
+    var go = 1 - 0.8 * lurch;
+    var hide = 0, peek = 0;
+    if (q >= 0) { hide = ez(seg(q, 0, 0.2)) * (1 - ez(seg(q, 0.68, 0.8))); peek = bump(seg(q, 0.3, 0.6)); }
+    var bobY = 1.2 * M.wave(t, 4, 0.12) * go;
+    var spec = [[31, 0, false, 29], [68, 0.25, false, 28], [38, 0.5, true, 29], [60, 0.75, true, 28]];
+    var legs = spec.map(function (c, j) {
+      var u = M.frac(t - c[1]), st = u < duty, v = st ? 0 : (u - duty) / (1 - duty), x, lf, fa;
+      if (st) x = A - 2 * A * (u / duty); else x = -A + 2 * A * ez(v);
+      lf = st ? 0 : 6 * bump(v); fa = st ? 0 : (-0.5 + 0.9 * v) * Math.pow(bump(v), 0.6);
+      x *= go; fa *= go;
+      if (j === 1 && drop > 0.3) { x = M.lerp(x, 17, lurch); lf *= 1 - lurch; fa *= 1 - lurch; }
+      return { hip: [c[0], 54], ank: [c[0] + x, G - 4.6 - lf], fa: fa, len: c[3], far: c[2], w0: 15, w1: 12, bend: 1 };
+    });
+    var sw = function (ph, a) { return a * M.wave(t, 2, ph); };
+    var base = [[96, 49], [102 + sw(0.1, 1.2), 56], [103 + sw(0.2, 2.6), 62], [100 + sw(0.32, 4), 68]];
+    var cur = [[96, 49], [104, 58], [101, 69], [88, 74]];
+    var trk = base.map(function (pt, j) { return j ? [M.lerp(pt[0], cur[j][0], drop), M.lerp(pt[1], cur[j][1], drop)] : pt; });
+    var ha = 0.04 * M.wave(t, 2, 0.1) + 0.3 * lurch + 0.05 * recov * 3, bt = 0.2 * lurch + 0.1 * recov;
+    var up = 1 - hide;
+    p.ellipse(58, G + 1, 40, 3, { fill: 'smoke', line: false, alpha: 0.5 });
+    p.pivot(58, G, 0, K, function () {
+      chang(p, { bx: 0, by: 6 + bobY + 2.5 * lurch, bt: bt, legs: legs, ha: ha, hk: 1.22, hy: 0, ear: M.lerp(-0.9, 0.86 + 0.14 * M.wave(t, 2, 0.15), up) + 0.12 * peek * M.wave(q < 0 ? 0 : q, 6), earA: 0.1 * M.wave(t, 2, 0.15), earK: 1.4, earY: 12.5 * hide, eyeOver: hide > 0.3, eyeK: 1.45, eye: M.bump(seg(t, 0.3, 0.34)) + 0.3 * lurch, tuft: true, tusk: false, trunk: trk, trunkW: 9.6, tipW: 3.6, tail: 0.3 * M.wave(t, 2, 0.3), mouth: 0 });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- chang-salute */
+/* the trunk raised in an S, the near front foot lifted and bent: the greeting at the gate of a sanctuary. */
+var UP = [[96, 47.5], [104.5, 43.5], [108.5, 33], [106, 22], [103.5, 14], [106.5, 8]];
+function sound(p, x, y, u, big) {
+  /* arcs leaving the trunk's tip, each drawn and then taken back */
+  [0, 1, 2].forEach(function (i) {
+    var v = M.seg(u, i * 0.16, 0.5 + i * 0.16), r = (6 + 6 * i) * (big ? 1.25 : 1), a0 = -0.62 - 0.1 * i, a1 = 0.62 + 0.1 * i;
+    if (v <= 0 || v >= 1) return;
+    var w0 = a0 + (a1 - a0) * M.easeIn(M.seg(v, 0.45, 1)), w1 = a0 + (a1 - a0) * M.easeOut(M.seg(v, 0, 0.6));
+    if (w1 - w0 > 0.05) p.arc(x, y, r, w0, w1, { w: 0.8, ink: 'a', cap: 'round' });
+  });
+}
+D.add('chang-salute', {
+  fam: 'thai', tapRest: 0.4, tags: ['elephant', 'chang', 'salute', 'trumpet', 'greeting', 'raised trunk', 'luck', 'animal', 'thailand', 'ช้าง', 'ทักทาย'], loop: 2.4, still: 0.3, ratio: 1.2, tapLen: 2, burst: false, tapMargin: [30, 24, 10, 14],
+  margin: [26, 14, 12, 14], about: 'the trunk raised in an S with its tip curling, the near front foot lifted and swaying, the ears fanning; a call rings out of the trunk now and again',
+  tapAbout: 'it trumpets: head up, mouth open, the trunk straight to the sky, rings of sound, and the lifted foot stamps down once in a puff of dust',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, tr = 0, stomp = 0, i;
+    if (q >= 0) { tr = ez(seg(q, 0, 0.16)) * (1 - ez(seg(q, 0.74, 0.96))); stomp = bump(seg(q, 0.22, 0.46)); }
+    var call = bump(seg(t, 0.42, 0.7)), lead = function (k) { return M.wave(t, 1, -k); };
+    var rock = 0.014 * M.wave(t, 1, 0.1), by = 0.45 * M.wave(t, 2, 0.2);
+    var trunk = UP.map(function (pt, j) {
+      var k = j / (UP.length - 1), cl = j ? [[0, 0], [106, 41], [109, 30], [108, 19], [107, 11], [107, 4]][j] : pt;
+      return [M.lerp(pt[0], cl[0] || pt[0], tr) + 1.7 * k * lead(0.1 + k * 0.22) - 1.2 * k * tr * M.wave(M.clamp(q, 0, 1), 3), M.lerp(pt[1], cl[1] || pt[1], tr) + 1.2 * k * M.wave(t, 2, -k * 0.25) * (1 - tr)];
+    });
+    var hip = fromBody({ bx: 0, by: by, bt: rock }, 68, 54);
+    var fa = 0.32 * M.wave(t, 2, 0.1) - 0.2 * stomp, drop = stomp;
+    var ank = [M.lerp(hip[0] + 12 + 2 * M.wave(t, 2, -0.05), 72, drop), M.lerp(hip[1] + 18 + 1.2 * M.wave(t, 2, 0.1), G - 4.6, ez(seg(q, 0.3, 0.42)) * (1 - ez(seg(q, 0.42, 0.52))))];
+    if (q < 0) drop = 0;
+    var legs = [
+      { hip: [31, 54], ank: [31, G - 4.6], len: 33, w0: 14.5 },
+      { hip: [68, 54], ank: ank, knee: [hip[0] + 13.5, hip[1] + 4 + 0.8 * M.wave(t, 2, 0.05)], fa: fa, len: 32, w0: 14.5, bend: 1 },
+      { hip: [38, 54], ank: [38, G - 4.6], len: 33, far: true, w0: 14.5 },
+      { hip: [60, 54], ank: [60, G - 4.6], len: 32, far: true, w0: 14.5 }
+    ];
+    p.ellipse(56, G + 1, 44, 3, { fill: 'smoke', line: false, alpha: 0.5 });
+    var o = { bx: 0, by: by + 0.8 * stomp - 0.6 * tr, bt: rock - 0.035 * tr, legs: legs, ha: -0.03 * tr + 0.03 * M.wave(t, 1, 0.3), ear: 0.76 + 0.2 * M.wave(t, 3, 0.12) - 0.3 * tr, earA: 0.12 * M.wave(t, 3, 0.12), trunk: trunk, tail: 0.2 * M.wave(t, 1, 0.4) + 0.08 * M.wave(t, 3), mouth: Math.max(tr, call * 0.55), eye: M.bump(seg(t, 0.9, 0.94)) };
+    chang(p, o);
+    var tip = headPt(o, trunk[trunk.length - 1][0], trunk[trunk.length - 1][1]);
+    if (!p.small) {
+      if (tr > 0.05) sound(p, tip[0] + 2, tip[1] + 1, M.clamp(seg(q, 0.05, 0.7), 0, 1), true);
+      else if (call > 0.02) sound(p, tip[0] + 2, tip[1] + 1, seg(t, 0.42, 0.7), false);
+      var du = seg(q, 0.3, 0.9);
+      if (q >= 0 && du > 0 && du < 1) for (i = 0; i < 3; i++) { var dd = M.easeOut(du), sz = (2.2 + i) * (1 - du * 0.7); p.circle(M.lerp(70, 70 + (i - 1) * 15, dd), G + 1 - 6 * dd * (1 + i % 2) * (1 - du), sz, { ink: 'stone', w: 0.5, alpha: 1 - du * 0.3 }); }
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- chang-kneel */
+/* the front legs folded and the elephant lowered onto its knees, the hind legs still standing: how it comes down for a bath or a rest.
+   It kneels, stays with its trunk curled on the ground, and gets up again. */
+function frontSp(o, hipX, ank, k, far) {
+  var h = fromBody(o, hipX, 54), kn = knee(h, ank, 16, 16, 1), stand = even(cr([h, kn, ank], 8), 12);
+  var K = [h[0] + 11 - (far ? 7 : 0), G - 5], fold = even(cr([h, [h[0] + 6, h[1] + 12], [K[0] + 1, K[1] - 5], [K[0] - 1, K[1] + 1], [K[0] - 9, G - 3.4], [K[0] - 18, G - 4.2]], 6), 12);
+  return blend(stand, fold, k);
+}
+D.add('chang-kneel', {
+  fam: 'thai', tapRest: 0.4, tags: ['elephant', 'chang', 'kneel', 'bow', 'rest', 'lower', 'animal', 'thailand', 'ช้าง', 'คุกเข่า'], loop: 6, still: 0.45, ratio: 1.2, tapLen: 2, burst: 'heart', burstAt: [96, 30], burstN: 3, burstSpread: 2.2, burstDelay: 0.4,
+  margin: [22, 18, 10, 18], about: 'it lowers itself onto folded front knees, rump up, lays its trunk on the ground with the tip curling, breathes, blinks, and rises again',
+  tapAbout: 'a deep bow: it sinks lower, the trunk curls up in a flourish, the eyes close',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, bow = 0;
+    var k = ez(seg(t, 0.06, 0.3)) * (1 - ez(seg(t, 0.7, 0.94)));
+    if (q >= 0) bow = ez(seg(q, 0, 0.3)) * (1 - ez(seg(q, 0.7, 1)));
+    var br = 0.55 * M.wave(t, 5, 0.1) * k, kk = Math.min(1, k + 0.0);
+    var o = { bx: 0, by: 7.5 * k + br + 2.2 * bow, bt: 0.17 * k + 0.05 * bow, ha: -0.15 * k - 0.04 * bow, fill: GREY };
+    var hindA = function (x) { return [x, G - 4.6]; };
+    var near = frontSp(o, 68, [71, G - 4.6], k, false), farS = frontSp(o, 60, [60, G - 4.6], k, true);
+    o.legs = [
+      { hip: [31, 54], ank: hindA(31), len: 34, w0: 14.5 },
+      { sp: near, fa: M.lerp(0, -1.5, k), w0: 14.5, nails: k > 0.5 ? 0 : 3 },
+      { hip: [38, 54], ank: hindA(39), len: 34, far: true, w0: 14.5 },
+      { sp: farS, fa: M.lerp(0, -1.5, k), far: true, w0: 14.5, nails: k > 0.5 ? 0 : 3 }
+    ];
+    var stand = [[96, 48], [102 + 1.5 * M.wave(t, 1, 0.1), 58], [103 + 4 * M.wave(t, 1, 0.2), 70], [101 + 6 * M.wave(t, 1, 0.3), 82]];
+    var rest = [[96, 49.5], [104, 58], [109.5, 66], [113.5, 72 - 0.4 * M.wave(t, 2)], [118.5, 70 - 5 * (1 + M.wave(t, 1, 0.1)) / 2 - 3 * bow]];
+    var tr = rest.map(function (pt, j) { var a = stand[Math.min(j, 3)]; return [M.lerp(a[0], pt[0], k), M.lerp(a[1], pt[1], k)]; });
+    o.trunk = tr;
+    o.ear = 0.8 + 0.15 * M.wave(t, 2, 0.15); o.earA = 0.08 * M.wave(t, 2, 0.15) * (1 - 0.5 * k);
+    o.eye = Math.max(M.bump(seg(t, 0.4, 0.44)), M.bump(seg(t, 0.55, 0.585)), bow); o.tail = 0.16 * M.wave(t, 2, 0.3) + 0.1 * M.wave(t, 3);
+    p.ellipse(56, G + 1, 46, 3, { fill: 'smoke', line: false, alpha: 0.5 });
+    chang(p, o);
+  }
+});
+
+/* ---------------------------------------------------------------- chang-sit */
+/* sitting back on its haunches: the hind legs stretched forward along the ground, the front legs straight, the chest up. */
+D.add('chang-sit', {
+  fam: 'thai', tapRest: 0.2, tags: ['elephant', 'chang', 'sit', 'haunches', 'rest', 'animal', 'thailand', 'ช้าง', 'นั่ง'], loop: 3.2, still: 0.25, ratio: 1.2, tapLen: 1.8, burst: false,
+  margin: [20, 16, 10, 16], about: 'sitting back on its haunches, the chest rising and falling, the head turning, the trunk swinging; now and again it shifts a front foot',
+  tapAbout: 'the trunk slaps down beside it twice, thump thump, in a puff of dust, as if asking you to sit',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, i, sl = 0;
+    var o = { bx: 0, by: 17.5 + 0.5 * M.wave(t, 1, 0.1), bt: -0.42 + 0.012 * M.wave(t, 1, 0.1), ha: 0.3 + 0.06 * M.wave(t, 1, 0.35), fill: GREY };
+    var H = [fromBody(o, 31, 54), fromBody(o, 38, 54)], pad = G - 4.4;
+    var hind = function (h, dx, dy, far) { return { sp: even(cr([h, [h[0] + 12 + dx, h[1] + 4 + dy], [h[0] + 24 + dx, G - 7 + dy], [h[0] + 34 + dx, pad + dy]], 6), 12), fa: 1.45, far: far, w0: 14, w1: 11, nails: 3 }; };
+    if (q >= 0) { var d1 = bump(seg(q, 0.1, 0.4)), d2 = bump(seg(q, 0.45, 0.75)); sl = Math.max(d1, d2); }
+    o.legs = [
+      hind(H[0], 0, 0, false),
+      { hip: [68, 54], ank: [72 + 0.5 * M.wave(t, 2, 0.1), G - 4.6 - 1.4 * Math.max(0, M.wave(t, 1, 0.5))], fa: 0.1, len: 24, w0: 14, w1: 11.5 },
+      hind(H[1], 6, -3, true),
+      { hip: [60, 54], ank: [61, G - 4.6], len: 24, far: true, w0: 14, w1: 11.5 }
+    ];
+    var hang = [[96, 48], [102 + 2 * M.wave(t, 1, 0.1), 58], [103.5 + 5 * M.wave(t, 1, 0.2), 70], [102 + 8 * M.wave(t, 1, 0.3), 81]];
+    var slap = [[96, 48], [104, 60], [107, 74], [105, 87]];
+    var sw = ez(seg(q, 0, 0.1)) * (1 - ez(seg(q, 0.8, 1)));
+    o.trunk = hang.map(function (pt, j) { var sp = slap[j]; return [M.lerp(pt[0], sp[0] - (j === 3 ? 6 * sl : 0), q >= 0 ? sw : 0), M.lerp(pt[1], sp[1] - (j === 3 ? 6 * sl : 0), q >= 0 ? sw : 0)]; });
+    o.ear = 0.8 + 0.17 * M.wave(t, 2, 0.2); o.earA = 0.1 * M.wave(t, 2, 0.2); o.eye = M.bump(seg(t, 0.6, 0.64)); var tw = 1.6 * M.wave(t, 1, 0.3);
+    o.tailBox = [[23, 76.4], [15.4, 82.4], [9, 86.4 + 0.3 * tw], [3.4, 86.6 + tw]];
+    p.ellipse(56, G + 1, 46, 3, { fill: 'smoke', line: false, alpha: 0.5 });
+    chang(p, o);
+    if (q >= 0 && !p.small) for (i = 0; i < 2; i++) { var u = seg(q, 0.18 + i * 0.35, 0.62 + i * 0.35); if (u > 0 && u < 1) { p.circle(106 - 5 * u, G - 2 - 3 * u, 3 * M.bump(u) + 0.3, { ink: 'stone', w: 0.5 }); p.circle(112 + 4 * u, G - 1 - 2 * u, 2 * M.bump(u) + 0.2, { ink: 'stone', w: 0.5 }); p.circle(100 - 8 * u, G - 1 - 1.5 * u, 2.4 * M.bump(u), { ink: 'stone', w: 0.5 }); } }
+  }
+});
+
+/* ---------------------------------------------------------------- chang-sleep */
+/* a rising Z: drawn by hand as it climbs, then taken back from its start */
+function zed(p, x, y, sz, ph, o) {
+  var d = 'M' + (x - sz) + ' ' + (y - sz) + ' L' + (x + sz) + ' ' + (y - sz) + ' L' + (x - sz) + ' ' + (y + sz) + ' L' + (x + sz) + ' ' + (y + sz);
+  p.span(d, M.easeIn(M.seg(ph, 0.55, 1)), M.easeOut(M.seg(ph, 0, 0.4)), o || { w: 0.9, ink: 'blue' });
+}
+/* head-local point for a spot in the box, the head set down with its neck at (nx, ny) and turned ha */
+function toHead(nx, ny, ha, X, Y) { var c = Math.cos(-ha), s = Math.sin(-ha), dx = X - nx, dy = Y - ny; return [NX + dx * c - dy * s, NY + dx * s + dy * c]; }
+D.add('chang-sleep', {
+  fam: 'thai', tapRest: 0.35, tags: ['elephant', 'chang', 'sleep', 'nap', 'dream', 'rest', 'zzz', 'night', 'animal', 'thailand', 'ช้าง', 'นอน', 'หลับ'], loop: 4, still: 0.25, ratio: 1.2, tapLen: 2.4, burst: false, tapMargin: [30, 20, 10, 14],
+  margin: [34, 14, 8, 14], about: 'lying on its side asleep: the great flank rises and falls with each breath, the ear stirs, the tail tip twitches, and Zs climb off the head',
+  tapAbout: 'one eye opens and looks at you, a sleepy sigh puffs from the trunk, the eye closes again',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, i;
+    var br = M.wave(t, 1, 0.1), lift = 0, look = 0, sigh = 0;
+    if (q >= 0) { lift = ez(seg(q, 0.04, 0.2)) * (1 - ez(seg(q, 0.68, 0.84))); sigh = seg(q, 0.45, 0.95); look = ez(seg(q, 0.2, 0.34)) * (1 - ez(seg(q, 0.5, 0.58))); }
+    var T = 1.7 * br, ox = 0;
+    var o = { fill: GREY, ha: 0.5, eyeK: 1 + 0.7 * lift, eye: 1 - 0.97 * lift, ear: 0.9 - 0.12 * br + 0.35 * bump(seg(t, 0.62, 0.74)) + 0.3 * bump(seg(q < 0 ? 0 : q, 0.1, 0.26)), earA: 0.06 * br, tusk: true };
+    var hx = 77 + ox, hy = 75 - 0.5 * br;                             /* where the neck sits, the head resting with its chin on the ground */
+    var tr = [[96, 48.5], [104, 58], [109, 70], [105, 80]];
+    var box = [[hx + 17.5, hy + 12], [hx + 24, hy + 15], [hx + 33, hy + 14.4], [hx + 36.4, hy + 9 - 5 * lift], [hx + 32, hy + 4 - 9 * lift]];
+    o.trunk = box.map(function (b) { return toHead(hx, hy, o.ha, b[0], b[1]); });
+    p.ellipse(60, G + 1, 52, 3, { fill: 'smoke', line: false, alpha: 0.5 });
+    /* the far legs, behind the body */
+    chLeg(p, o, { sp: even(cr([[70 + ox, 80], [80 + ox, 83], [92 + ox, 85.8], [100 + ox, 86.8]], 6), 12), fa: 1.45, far: true, w0: 13, w1: 11 });
+    /* the tail laid out behind the rump, its tuft twitching */
+    var tw = 3 * M.wave(t, 2, 0.2) * bump(seg(M.frac(t * 2), 0.5, 1));
+    column(p, cr([[21 + ox, 68], [13 + ox, 70], [8 + ox, 75], [8 + ox, 80 - tw * 0.4]], 5), function (u) { return 3.2 - 1.4 * u; }, { end: 'round', fill: GREY, w: 0.8 });
+    p.path('M6.4 ' + (79 - tw * 0.4) + ' C3.6 ' + (81.6 - tw * 0.4) + ' 4 ' + (86 - tw * 0.3) + ' 7.6 ' + (88 - tw * 0.2) + ' C10.8 ' + (86 - tw * 0.3) + ' 10.8 ' + (82 - tw * 0.4) + ' 9.4 ' + (79 - tw * 0.4) + ' Z', { fill: 'black', w: 0.5 });
+    /* the body: a great loaf lying on its side; the top breathes */
+    var top = 57.5 - T, d = 'M' + (20 + ox) + ' 90 C' + (13 + ox) + ' 78 ' + (17 + ox) + ' ' + (65 - T * 0.4) + ' ' + (32 + ox) + ' ' + (top + 2.5) + ' C' + (46 + ox) + ' ' + (top - 2) + ' ' + (66 + ox) + ' ' + (top - 1) + ' ' + (76 + ox) + ' ' + (top + 7) + ' C' + (86 + ox) + ' ' + (top + 15) + ' ' + (86 + ox) + ' 82 ' + (81 + ox) + ' 90 Z';
+    p.path(d, { fill: GREY, w: 1 });
+    if (!p.small) {
+      for (i = 0; i < 4; i++) p.path('M' + (36 + i * 8 + ox) + ' ' + (top + 4 + i * 0.8 - T * 0.2) + ' C' + (38 + i * 8 + ox) + ' ' + (top + 14) + ' ' + (36 + i * 8 + ox) + ' ' + (top + 22) + ' ' + (33 + i * 8 + ox) + ' ' + (top + 27), { w: 0.4, detail: true, ink: DARK });
+      p.path('M' + (26 + ox) + ' 76 C' + (30 + ox) + ' 70 ' + (36 + ox) + ' 70 ' + (40 + ox) + ' 74 C' + (40 + ox) + ' 80 ' + (34 + ox) + ' 84 ' + (28 + ox) + ' 82', { w: 0.4, detail: true, ink: DARK });
+    }
+    chLeg(p, o, { sp: even(cr([[68 + ox, 78], [79 + ox, 82.5], [92 + ox, 86.4], [100 + ox, 87.6]], 6), 12), fa: 1.45, w0: 13.5, w1: 11, nails: 3 });
+    /* the head laid on its foreleg */
+    p.push(); p.move(hx - NX, hy - NY);
+    p.pivot(NX, NY, o.ha, 1, function () { chHead(p, o); });
+    p.pop();
+    chLeg(p, o, { sp: even(cr([[36 + ox, 76], [26 + ox, 81], [17 + ox, 84.4], [11 + ox, 86]], 6), 12), fa: -1.35, w0: 13, w1: 10.4, nails: 3 });
+    /* the sigh: a few arcs of breath leaving the trunk's tip */
+    var tip = box[box.length - 1];
+    if (!p.small && sigh > 0 && sigh < 1) for (i = 0; i < 3; i++) { var v = seg(sigh, i * 0.14, 0.6 + i * 0.14); if (v > 0 && v < 1) p.arc(tip[0] + 4 + 6 * v * (i + 1), tip[1] - 3 * v - i * 2, 2.5 + 3 * v, -1.9 - 0.2 * v, 1.9 + 0.2 * v, { w: 0.6, ink: 'sky', rot: 0, ry: 2.5 + 3 * v }); }
+    /* the dream */
+    if (!p.small || true) for (i = 0; i < 3; i++) { var ph = M.frac(t * 1 + i / 3), sz = 1.4 + 2.2 * M.easeOut(M.seg(ph, 0, 0.7)); zed(p, hx + 8 + 24 * ph + 2 * Math.sin(ph * 9 + i), hy - 22 - 38 * ph, p.small ? sz * 1.3 : sz, ph, { w: p.small ? 1.4 : 0.9, ink: 'blue' }); }
+  }
+});
+
+/* ---------------------------------------------------------------- chang-bathe */
+var BACK = [[96, 47.5], [105, 41], [104, 26], [93, 13.5], [80, 12.5], [71, 19]];
+D.add('chang-bathe', {
+  fam: 'thai', tapRest: 0.72, tags: ['elephant', 'chang', 'bathe', 'bath', 'spray', 'water', 'river', 'cool', 'songkran', 'animal', 'thailand', 'ช้าง', 'อาบน้ำ'], loop: 2.4, still: 0.2, ratio: 1.2, tapLen: 2.6, burst: false, tapMargin: [60, 30, 10, 20],
+  margin: [24, 18, 12, 14], about: 'standing in the river with the trunk curled back over its head, spraying water along its own back; the water runs down its flanks and rings spread round its legs, eyes shut in bliss',
+  tapAbout: 'it dips the trunk in the river, lifts it with a gulp, and sends a great fountain up and over, raining down all round',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, i, dip = 0, up = 0, fount = 0, WY = 73;
+    if (q >= 0) { dip = ez(seg(q, 0, 0.2)) * (1 - ez(seg(q, 0.2, 0.34))); up = ez(seg(q, 0.3, 0.46)) * (1 - ez(seg(q, 0.84, 0.97))); fount = seg(q, 0.46, 0.95); }
+    var away = Math.max(dip, up), by = 1 + 0.5 * M.wave(t, 1, 0.1) - 1.2 * dip;
+    var DIP = [[96, 49], [104, 60], [107, 74], [104, 88], [104, 93]], UPF = [[96, 47.5], [106, 41], [112, 30], [113.5, 18], [111, 6], [114, 0]];
+    var o = { bx: 0, by: by, bt: 0.01 * M.wave(t, 1, 0.2) + 0.05 * dip, ha: 0.1 * (1 - away) + 0.22 * dip - 0.12 * up + 0.03 * M.wave(t, 2, 0.1), fill: GREY, eye: 1 - 0.9 * up * 0, ear: 0.8 + 0.18 * M.wave(t, 2, 0.12), earA: 0.12 * M.wave(t, 2, 0.12), tail: 0.2 * M.wave(t, 1, 0.3) };
+    var lerpPts = function (a, b, u) { var n = Math.max(a.length, b.length), r = [], j; for (j = 0; j < n; j++) { var A = a[Math.min(j, a.length - 1)], B = b[Math.min(j, b.length - 1)]; r.push([M.lerp(A[0], B[0], u), M.lerp(A[1], B[1], u)]); } return r; };
+    var trunk = BACK.map(function (pt, j) { return [pt[0] + 1.4 * M.wave(t, 2, -j * 0.04) * (j > 2), pt[1] + 1.2 * M.wave(t, 2, -j * 0.05) * (j > 2)]; });
+    trunk = lerpPts(trunk, DIP, dip); trunk = lerpPts(trunk, UPF, up);
+    o.trunk = trunk;
+    o.legs = [
+      { hip: [31, 54], ank: [31, G - 4.6], len: 34, w0: 14.5 }, { hip: [68, 54], ank: [68, G - 4.6], len: 33, w0: 14.5 },
+      { hip: [39, 54], ank: [39, G - 4.6], len: 34, far: true, w0: 14.5 }, { hip: [60, 54], ank: [60, G - 4.6], len: 33, far: true, w0: 14.5 }
+    ];
+    chang(p, o);
+    var tipL = trunk[trunk.length - 1], Tp = headPt(o, tipL[0], tipL[1]);
+    /* the spray off the tip, falling along the back; drops land and run down the flank */
+    var back = function (x) { return 31.6 + 0.0055 * (x - 52) * (x - 52) + by; };
+    if (!p.small && up < 0.3 && dip < 0.3) {
+      for (i = 0; i < 9; i++) {
+        var u = M.frac(t * 2 + i / 9 * 0.9 + 0.13 * (i % 3)), xl = 66 - i * 3.5, yl = back(xl) - 0.5, e = 0.22 * u + 0.78 * u * u, x1 = Tp[0] + (xl - Tp[0]) * u, y1 = Tp[1] + 3 + (yl - Tp[1] - 3) * e - 3 * Math.sin(Math.PI * u), u0 = Math.max(0, u - 0.09), e0 = 0.22 * u0 + 0.78 * u0 * u0;
+        p.line(Tp[0] + (xl - Tp[0]) * u0, Tp[1] + 3 + (yl - Tp[1] - 3) * e0 - 3 * Math.sin(Math.PI * u0), x1, y1, { w: 0.9, ink: 'sky', cap: 'round' });
+      }
+      for (i = 0; i < 6; i++) {
+        var ph = M.frac(t * 2 + i * 0.17), x0 = 38 + i * 5.2 + 0.6 * (i % 2);
+        p.span('M' + x0 + ' ' + (back(x0) + 2.5) + ' C' + (x0 + 2.4) + ' ' + (back(x0) + 12) + ' ' + (x0 - 2) + ' ' + (back(x0) + 22) + ' ' + (x0 + 1) + ' ' + (WY - 3), M.easeIn(M.seg(ph, 0.35, 1)), M.easeOut(M.seg(ph, 0, 0.7)), { w: 0.8, ink: 'sky' });
+      }
+    }
+    if (fount > 0 && !p.small) {
+      /* the great jet: up out of the trunk and over, falling back on its own head; what it throws off comes down as rain */
+      var Tu = headPt({ bx: 0, by: 1, bt: 0, ha: -0.12 }, UPF[5][0], UPF[5][1]), x0 = Tu[0] + 1, y0 = Tu[1] + 5, jet = [], k, j1 = ez(seg(fount, 0, 0.42)), j0 = ez(seg(fount, 0.4, 0.88));
+      for (k = 0; k <= 26; k++) { var tj = 0.92 * k / 26; jet.push([x0 - 46 * tj, y0 - 74 * tj + 118 * tj * tj]); }
+      p.span(jet, j0, j1, { w: 2.6, ink: 'sky', cap: 'round', wob: 0.6 });
+      p.span(jet, j0, Math.max(j0, j1 - 0.05), { w: 0.55, ink: 'blue', wob: 0.6 });
+      var land = jet[jet.length - 1], sp2 = seg(fount, 0.36, 0.95);
+      for (i = 0; i < 9; i++) {
+        var rr = M.rng(61 + i)(), an = -Math.PI / 2 + (i - 4) * 0.34 + 0.2 * rr, v = 20 + 14 * rr + 4 * (i % 3), tt = sp2 * 0.75, dx = land[0] + 2 + Math.cos(an) * v * tt, dy = land[1] + Math.sin(an) * v * tt + 80 * tt * tt;
+        if (sp2 > 0 && sp2 < 1 && dy < WY) p.dot(dx, dy, 1.7 * (1 - 0.5 * sp2), 'sky');
+      }
+    }
+    /* the river: what is under it is seen through it */
+    var top = sinew(1, 119, WY, 1.2, 26, t * 2);
+    p.path('M' + top.map(function (v) { return v[0].toFixed(1) + ' ' + v[1].toFixed(1); }).join(' L') + ' L119 97 Q60 101 1 97 Z', { fill: 'sky', line: false, alpha: 0.46 });
+    p.curve(top, { ink: 'blue', w: 0.8 });
+    if (!p.small) {
+      p.curve(sinew(6, 112, WY + 8, 1, 30, -t * 2 + 0.3), { ink: 'blue', w: 0.45, detail: true });
+      [31, 68, 39, 60].forEach(function (lx, j) { var v = M.frac(t * 2 + j * 0.27), a1 = TAU * M.easeOut(M.seg(v, 0, 0.6)), a0 = TAU * M.easeIn(M.seg(v, 0.4, 1)); if (a1 - a0 > 0.1) p.arc(lx + 1, WY + 2, 5 + 11 * v, a0 - 0.5, a1 - 0.5, { ry: 1.4 + 2.4 * v, w: 0.65, ink: 'blue' }); });
+      if (dip > 0.3) for (i = 0; i < 3; i++) { var bv = M.frac(i / 3 + dip * 0.7); p.circle(Tp[0] + 1 + 2 * Math.sin(bv * 7 + i), WY + 10 - 11 * bv, 0.9 + (i % 2) * 0.6, { ink: 'blue', w: 0.5 }); }
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- nagas
+   นาค. The serpent of the waters and the guardian of the temple stair. Green or teal scales with a pale belly, a gold crest of flame
+   along the back and above the brow, a red mouth. Drawn upright and dignified. */
+/* both edges of a ribbon along a spine: L the belly side, R the back, and the angle of the spine at each point */
+function edges(sp, wf) {
+  var n = sp.length, L = [], R = [], A = [], i, a, b, d, h, nx, ny;
+  for (i = 0; i < n; i++) {
+    a = sp[Math.max(0, i - 1)]; b = sp[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; h = wf(i / (n - 1)) / 2; nx = -(b[1] - a[1]) / d; ny = (b[0] - a[0]) / d;
+    L.push([sp[i][0] + nx * h, sp[i][1] + ny * h]); R.push([sp[i][0] - nx * h, sp[i][1] - ny * h]); A.push(Math.atan2(b[1] - a[1], b[0] - a[0]));
+  }
+  return { L: L, R: R, A: A };
+}
+/* the body of a naga along sp (tail first): gold flames down the back, the scaled tube, the pale belly in plates, scales in chevrons;
+   gl runs 0 → 1 as a glint travelling one scale after another from the head end down to the tail */
+function nagaBody(p, sp, wf, o) {
+  var E = edges(sp, wf), n = sp.length, i, hh, fill = o.fill || 'green', step = o.step || 3, gl = o.gl, small = p.small, rid = o.ridge !== false;
+  if (rid) for (i = 3; i < n - (o.noRidge || 9); i += 4) {
+    hh = wf(i / (n - 1)) / 2;
+    p.at(E.R[i][0], E.R[i][1], E.A[i], 1, function () { p.path('M-2.6 0.6 C-2.4 -2.4 -0.8 -4.4 0.6 -6.2 C1.2 -4 3.2 -2.6 2.8 0.6 Z', { fill: 'gold', w: 0.6 }); });
+  }
+  tube(p, sp, wf, { fill: fill, w: 1 });
+  var band = E.L.slice(), inner = [];
+  for (i = 0; i < n; i++) { band[i] = mix(sp[i], E.L[i], 0.86); inner.push(mix(sp[i], E.L[i], 0.3)); }
+  p.poly(band.concat(inner.slice().reverse()), { fill: o.belly || 'cream', line: false });
+  if (!small) for (i = step; i < n - 1; i += step) {
+    hh = wf(i / (n - 1)) / 2;
+    var glow = gl != null && Math.abs(M.frac(gl) * (n / step) - i / step) < 0.7, k = i;
+    p.at(sp[i][0], sp[i][1], E.A[i], 1, function () {
+      p.path('M1.3 ' + (-hh * 0.9) + ' Q-1.8 ' + (-hh * 0.2) + ' 1.3 ' + (hh * 0.3), glow ? { w: 0.9, ink: 'gold' } : { w: 0.35, ink: 'night', detail: true });
+      p.line(0.4, hh * 0.38, 0.4, hh * 0.84, { w: 0.3, ink: 'brown', detail: true });
+    });
+  }
+  return E;
+}
+var CREST = 'M-2.6 0 C-5.4 -4.6 -4.6 -12 -0.4 -19 C0.2 -15.4 2.6 -13 3.8 -9.6 C5 -5.6 3.6 -2 2.6 0 Z';
+/* the head in profile, facing right, the origin where the neck ends. o: open (0..1, the jaw), blink, tongue (0..1), flare (the crest), t (its sway),
+   crest (how many flames), body (the colour) */
+function nagaHead(p, o) {
+  var op = o.open || 0, bl = o.blink || 0, fl = o.flare == null ? 0.5 : o.flare, t = o.t || 0, i, small = p.small, body = o.body || 'green', nc = o.crest || 5, a = op * 0.62, hx = -0.5, hy = 3.4;
+  /* the crest: flames fanned back off the skull, the front ones leading */
+  for (i = 0; i < nc; i++) {
+    p.at(3.5, -13, 0.3 - i * (0.3 + 0.1 * fl) + 0.06 * M.wave(t, 2, 0.5 - i * 0.08), [1, [0.78, 1.0, 1.14, 1.04, 0.86][i % 5]], function () {
+      p.path(CREST, { fill: 'gold', w: 0.8 });
+      if (!small) p.path('M0.2 -3 C-0.6 -8 0.2 -12 1.6 -15', { w: 0.35, detail: true, ink: 'red' });
+    });
+  }
+  /* a fin flaring behind the jaw, and the whiskers */
+  p.path('M-3 4 C-7 3.4 -10 5.6 -11.4 9 C-8 8.4 -6.6 9.6 -5 12 C-3.6 9.6 -3 7.4 -2 5.6 Z', { fill: 'gold', w: 0.7 });
+  if (!small) { p.path('M31.5 -5 C37 -3.6 40 0.4 38.4 5.4', { w: 0.6, ink: 'gold' }); p.path('M30 3 C34 6 34.6 10 32 13', { w: 0.55, ink: 'gold' }); }
+  /* the open mouth: a red wedge, the jaw swung down about its hinge, the tongue */
+  var lj = function (x, y) { var dx = x - hx, dy = y - hy; return [hx + dx * Math.cos(a) - dy * Math.sin(a), hy + dx * Math.sin(a) + dy * Math.cos(a)]; };
+  if (op > 0.04) {
+    var t1 = lj(30.5, 2.4), t0 = lj(6, 6);
+    p.poly([[-1, 1.5], [31, -1.4], t1, t0], { fill: 'red', w: 0.6 });
+    if (o.tongue > 0.02) { var tg = o.tongue, tx = 24 + 12 * tg, ty = 4 + 5 * op; p.draw('M14 ' + (4 + 3 * op) + ' C20 ' + (5 + 3 * op) + ' ' + (tx - 4) + ' ' + ty + ' ' + tx + ' ' + (ty + 0.5), M.clamp(tg * 1.4, 0, 1), { w: 0.9, ink: 'rose' }); if (tg > 0.6) { p.line(tx, ty + 0.5, tx + 3.4, ty - 1.4, { w: 0.6, ink: 'rose' }); p.line(tx, ty + 0.5, tx + 3.4, ty + 2.6, { w: 0.6, ink: 'rose' }); } }
+  }
+  p.pivot(hx, hy, a, 1, function () {
+    p.path('M-1 2 C6 2 16 1 28 0.4 C31 0.3 32.8 1.8 31.2 3.4 C26 7.6 14 9.6 6 9 C1 8.4 -2 5.6 -1 2 Z', { fill: body, w: 0.95 });
+    if (op > 0.3) { p.poly([[23, 1.2], [24.4, -2.4], [25.6, 1]], { fill: 'white', w: 0.4 }); }
+    if (!small) { p.path('M8 6.5 C14 8 21 7.2 27 4.8', { w: 0.35, detail: true, ink: 'cream' }); p.path('M3 3.4 C5 7.4 5 9 4 10.6', { w: 0.5, ink: 'gold' }); }
+  });
+  /* the skull and upper jaw */
+  p.path('M-5.4 -6 C-5 -13.4 2.4 -17.6 10 -16 C15 -15 19 -12.6 23 -10.6 C27 -8.8 31.2 -9.4 33.4 -7.2 C35 -5.4 34 -2.6 31.4 -1.6 C26 -0.2 18 0.6 10 1.6 C5 2.2 1 3 -1 2 C-4.4 0.2 -5.6 -3 -5.4 -6 Z', { fill: body, w: 1 });
+  if (!small) p.path('M16 -11 C19 -10.6 21 -9.6 22.4 -8', { w: 0.35, detail: true, ink: 'night' });
+  p.dot(30.6, -6.4, 0.8, 'night');
+  p.poly([[26.4, -0.4], [27.6, 4.2 + 1.2 * op], [28.8, -0.8]], { fill: 'white', w: 0.45 });
+  /* scales on the cheek, and the brow */
+  if (!small) { p.path('M1 -3 Q4 -1 7 -4', { w: 0.3, detail: true, ink: 'night' }); p.path('M1.6 -8 Q4.6 -5.6 7.6 -8.4', { w: 0.3, detail: true, ink: 'night' }); }
+  p.path('M5 -12 C9 -15.4 15 -14.6 19 -11.2', { w: 0.9, ink: 'gold' });
+  /* the eye */
+  if (bl > 0.6) p.path('M8.6 -9.2 C10.6 -7.6 13.4 -7.8 15 -9.4', { w: 0.8 });
+  else { p.ellipse(11.8, -9.6, 3.5, 2.8, { fill: 'white', w: 0.6 }); p.dot(12.6, -9.6, 1.7, 'ink'); p.dot(13.2, -10.2, 0.5, 'white'); }
+}
+/* little gold flames for the glow of an ember or a fireball */
+function ember(p, x, y, k, lean, ph) {
+  p.at(x, y, lean, k, function () {
+    p.path('M-3 0 C-4 -4 -2.6 -8 0 -12 C1 -8 4 -6 3.4 -2 C3 -0.6 1.6 0.4 0 0.4 C-1.4 0.4 -2.6 0.4 -3 0 Z', { fill: 'flame', w: 0.7 });
+    p.path('M-1.4 -0.2 C-1.6 -3 -0.6 -5 0.4 -7 C1.4 -4.6 2 -3 1.4 -0.6 Z', { fill: 'yellow', line: false });
+  });
+}
+
+/* ---------------------------------------------------------------- naga-stair */
+/* the temple stair balustrade ends in a naga: the body runs down beside the steps, then the neck rears up into a head with a gold crest */
+D.add('naga-stair', {
+  fam: 'thai', tapRest: 0.4, tags: ['naga', 'nak', 'serpent', 'temple stair', 'balustrade', 'doi suthep', 'guardian', 'wat', 'lanna', 'scales', 'นาค', 'บันไดนาค'], loop: 3.2, still: 0.3, ratio: 1, tapLen: 2.2, burst: 'ember', burstAt: [100, 22], burstN: 5, burstSpread: 1.6, burstDelay: 0.22, burstGravity: -30,
+  margin: [24, 22, 10, 14], about: 'the balustrade naga: its scales catch the light one after another down the stair, the neck sways, the crest flames flicker, the jaw works and the tongue flicks',
+  tapAbout: 'it rears and flares its crest and breathes out a small ember that floats up',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, i, rise = 0, brea = 0;
+    if (q >= 0) { rise = M.spring(seg(q, 0, 0.3)) * (1 - ez(seg(q, 0.68, 0.96))); brea = bump(seg(q, 0.2, 0.78)); }
+    /* the steps, rising to the left beside the balustrade */
+    var st = 'M3 91 L3 37', xx = 3, yy = 37;
+    for (i = 0; i < 6; i++) { xx += 9.4; st += ' L' + xx + ' ' + yy; yy += 7.7; if (i < 5) st += ' L' + xx + ' ' + yy; }
+    st += ' L' + xx + ' 91 Z';
+    p.path(st, { fill: 'sand', w: 0.9 });
+    for (i = 0; i < 6; i++) p.path('M' + (3 + i * 9.4 + 1.5) + ' ' + (37 + i * 7.7 + 3.4) + ' L' + (3 + i * 9.4 + 7.6) + ' ' + (37 + i * 7.7 + 3.4), { w: 0.35, detail: true, ink: 'brown' });
+    p.line(1, 91, 66, 91, { w: 0.9 });
+    var sway = M.wave(t, 1, 0.05), sw2 = M.wave(t, 1, -0.07), lift = 7 * rise;
+    var hx = 66 + 2 * sw2 + 3 * rise, hy = 33 - lift + 1.6 * sway;
+    var pts = [[2, 18], [12, 26], [24, 37], [36, 48], [47, 57.5], [56, 62], [63, 56 + 0.6 * sway], [64.4, 44 - 0.5 * lift + 1.4 * sw2], [hx - 1, hy + 2]];
+    var sp = cr(pts, 7), W = function (u) { return u < 0.55 ? 4 + 8 * Math.pow(u / 0.55, 0.9) : 12 - 0.4 * (u - 0.55) / 0.45 * 3; };
+    var gl = 1 - M.frac(t * 1);
+    nagaBody(p, sp, W, { gl: gl, step: 3 });
+    var open = 0.22 + 0.16 * M.wave(t, 1, 0.2) + 0.6 * brea + 0.2 * rise, tg = bump(seg(M.frac(t * 1 + 0.15), 0.1, 0.5)) * (1 - rise), ang = -0.06 + 0.07 * sway - 0.22 * rise;
+    p.at(hx, hy, ang, p.small ? 1.12 : 0.9, function () { nagaHead(p, { open: Math.min(1, open), blink: bump(seg(t, 0.84, 0.88)), tongue: tg, flare: 0.5 + 0.25 * M.wave(t, 2, 0.1) + 0.7 * rise, t: t, body: 'green', crest: 5 }); });
+    if (brea > 0.02) {
+      var mx = hx + 0.9 * (33 * Math.cos(ang) + 0.5 * Math.sin(ang)) + 3, my = hy + 0.9 * (33 * Math.sin(ang) + 0.5 * Math.cos(ang)) + 1;
+      ember(p, mx + 2 * brea, my - 5 * brea, 0.5 + 1.1 * brea, 1.15 + 0.12 * M.wave(q, 5), 0);
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- naga-seven */
+/* a naga face seen from the front: a rounded shield of a head, gold flames fanned over the brow, flame ears, a pale snout with two fangs */
+var FLAME = 'M-2.4 0 C-4.8 -4.4 -3.8 -11 0.4 -18 C0.8 -13 3.8 -9.6 4 -5.6 C4.2 -2.6 3 -0.8 2.4 0 Z';
+function nagaFace(p, o) {
+  var fl = o.flare == null ? 0.5 : o.flare, t = o.t || 0, small = p.small, body = o.body || 'green', i, bl = o.blink || 0, op = o.open || 0, ph = o.ph || 0;
+  for (i = 0; i < 5; i++) {
+    p.at((i - 2) * 1.8, -8.5, (i - 2) * (0.32 + 0.12 * fl) + 0.05 * M.wave(t, 2, ph + i * 0.07), [0.8, [0.5, 0.72, 0.92, 0.72, 0.5][i]], function () { p.path(FLAME, { fill: 'gold', w: 0.75 }); });
+  }
+  [-1, 1].forEach(function (d) { p.path('M' + (d * 7.4) + ' -0.4 C' + (d * 12.4) + ' -1 ' + (d * 14.4) + ' -6 ' + (d * 13) + ' -10.4 C' + (d * 9.4) + ' -8.4 ' + (d * 7.6) + ' -5.4 ' + (d * 6.8) + ' -2.6 Z', { fill: 'gold', w: 0.7 }); });
+  p.path('M0 -10.4 C6.6 -10.4 9.2 -5.4 8.8 0.6 C8.4 6.2 5.8 10.8 0 12.2 C-5.8 10.8 -8.4 6.2 -8.8 0.6 C-9.2 -5.4 -6.6 -10.4 0 -10.4 Z', { fill: body, w: 1 });
+  p.path('M-5.6 -6.2 C-3 -8.4 3 -8.4 5.6 -6.2', { w: 0.8, ink: 'gold' });
+  p.poly([[0, -9], [1.5, -7], [0, -5], [-1.5, -7]], { fill: 'red', w: 0.4 });
+  [-1, 1].forEach(function (d) {
+    if (bl > 0.6) p.path('M' + (d * 3.6 - 2.2) + ' -2.6 Q' + (d * 3.6) + ' -0.6 ' + (d * 3.6 + 2.2) + ' -2.6', { w: 0.6 });
+    else { p.ellipse(d * 3.7, -2.8, 2.5, 2, { fill: 'white', w: 0.5 }); p.dot(d * 3.7 + d * 0.3, -2.8, 1.2, 'ink'); }
+  });
+  p.ellipse(0, 6, 4.8, 3.6, { fill: 'mint', w: 0.7 });
+  if (!small) { p.dot(-1.7, 5.2, 0.65, 'night'); p.dot(1.7, 5.2, 0.65, 'night'); }
+  if (op > 0.05) p.path('M-3.4 8.6 C-1.6 ' + (9.4 + 2.4 * op) + ' 1.6 ' + (9.4 + 2.4 * op) + ' 3.4 8.6 C2 ' + (10.4 + 3 * op) + ' -2 ' + (10.4 + 3 * op) + ' -3.4 8.6 Z', { fill: 'red', w: 0.5 });
+  else p.path('M-3.2 8.8 Q0 10.2 3.2 8.8', { w: 0.55 });
+  p.poly([[-3, 8.7], [-2.3, 11.2], [-1.6, 9]], { fill: 'white', w: 0.4 }); p.poly([[3, 8.7], [2.3, 11.2], [1.6, 9]], { fill: 'white', w: 0.4 });
+}
+D.add('naga-seven', {
+  fam: 'thai', tapRest: 0.45, tags: ['naga', 'nak', 'seven heads', 'seven-headed', 'hood', 'canopy', 'mucalinda', 'serpent', 'shelter', 'protection', 'นาค', 'นาคเจ็ดเศียร', 'พญานาค'], loop: 3.6, still: 0.2, ratio: 1, tapLen: 2.2, burst: 'spark', burstAt: [50, 20], burstN: 6, burstSpread: 3, burstColor: 'gold', burstDelay: 0.3, burstGravity: 30,
+  margin: [30, 18, 6, 18], about: 'the seven-headed naga fanned up like a canopy over its coils: the heads sway one after another from left to right, the crests flicker, the eyes blink in turn',
+  tapAbout: 'the seven heads rise in a wave from one end to the other, springing up on their necks, crests flared, and gold sparks fly',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, i, B = [50, 75], order = [0, 6, 1, 5, 2, 4, 3], o2;
+    for (o2 = 0; o2 < 7; o2++) {
+      i = order[o2];
+      var d = i - 3, th0 = d * 0.4, ph = i * 0.1, sw = M.wave(t, 1, -ph), R0 = 46 - 3.2 * Math.abs(d), up = 0, fl = 0.4 + 0.3 * M.wave(t, 2, -ph);
+      if (q >= 0) { up = M.spring(seg(q, i * 0.065, i * 0.065 + 0.42)) * (1 - ez(seg(q, 0.64 + i * 0.04, 0.96))); fl += 0.7 * up; }
+      var th = th0 + 0.05 * sw + 0.03 * d * up, R = R0 + 1.6 * sw + 9 * up;
+      var H = [B[0] + R * Math.sin(th), B[1] - R * Math.cos(th)], m1 = [B[0] + R * 0.36 * Math.sin(th * 0.45), B[1] - R * 0.36 * Math.cos(th * 0.45)], m2 = [B[0] + R * 0.7 * Math.sin(th * 0.85), B[1] - R * 0.7 * Math.cos(th * 0.85)];
+      var sp = cr([B, m1, m2, H], 6);
+      tube(p, sp, function (u) { return 8 - 2.6 * u; }, { fill: 'sea', w: 0.95 });
+      if (!p.small) for (var k = 4; k < sp.length - 4; k += 4) p.at(sp[k][0], sp[k][1], Math.atan2(sp[k + 1][1] - sp[k - 1][1], sp[k + 1][0] - sp[k - 1][0]), 1, function () { p.path('M1 -2.4 Q-1.4 0 1 2.4', { w: 0.3, ink: 'night', detail: true }); });
+      p.at(H[0], H[1] - 2, th * 0.8, 1.0 - 0.06 * Math.abs(d), function () { nagaFace(p, { flare: fl, t: t, ph: -ph, body: 'sea', blink: bump(seg(M.frac(t - ph * 0.5), 0.9, 0.96)), open: 0.4 * up }); });
+    }
+    /* the coils the heads rise from, the tail curling out of the lowest */
+    column(p, cr([[80, 88], [91, 88.4], [97, 82], [94, 74], [88, 71]], 5), function (u) { return 9 - 7.6 * u; }, { end: 'round', fill: 'sea', w: 0.9 });
+    p.path('M86 69.4 C88.6 66.4 91 66.4 91.6 68.6 C90.4 70 89 71 87.2 71.4 Z', { fill: 'gold', w: 0.6 });
+    [[50, 86.5, 40, 9.4], [50, 78, 31, 8.4], [50, 70.6, 21, 7]].forEach(function (c, j) {
+      p.ellipse(c[0], c[1], c[2], c[3], { fill: 'sea', w: 1 });
+      p.path('M' + (c[0] - c[2] * 0.86) + ' ' + (c[1] + c[3] * 0.5) + ' C' + (c[0] - c[2] * 0.5) + ' ' + (c[1] + c[3] * 1.04) + ' ' + (c[0] + c[2] * 0.5) + ' ' + (c[1] + c[3] * 1.04) + ' ' + (c[0] + c[2] * 0.86) + ' ' + (c[1] + c[3] * 0.5) + ' C' + (c[0] + c[2] * 0.5) + ' ' + (c[1] + c[3] * 0.62) + ' ' + (c[0] - c[2] * 0.5) + ' ' + (c[1] + c[3] * 0.62) + ' ' + (c[0] - c[2] * 0.86) + ' ' + (c[1] + c[3] * 0.5) + ' Z', { fill: 'cream', line: false });
+      if (!p.small) for (var k2 = -3; k2 <= 3; k2++) { var cx = c[0] + k2 * c[2] * 0.25, cyy = c[1] + c[3] * (0.8 - 0.3 * k2 * k2 / 9); p.path('M' + (cx - 1.4) + ' ' + (cyy - c[3] * 0.42) + ' Q' + (cx + 1.2) + ' ' + cyy + ' ' + (cx - 1.4) + ' ' + (cyy + c[3] * 0.3), { w: 0.3, ink: 'night', detail: true }); }
+    });
+  }
+});
+
+/* ---------------------------------------------------------------- naga-river */
+/* the naga of the Mekong swims through the water, its body rising in arches and diving again, the whole serpent drawn right through the river so that the dives are still seen under the surface */
+D.add('naga-river', {
+  fam: 'thai', tapRest: 0.5, tags: ['naga', 'nak', 'river', 'mekong', 'swimming', 'water', 'waves', 'fireball', 'serpent', 'nong khai', 'นาค', 'แม่น้ำโขง', 'บั้งไฟพญานาค'], loop: 3.6, still: 0.15, ratio: 1.2, tapLen: 2.6, burst: false, tapMargin: [60, 20, 8, 14],
+  margin: [26, 20, 8, 14], about: 'the naga swims up the river, its body rising in arches and dipping out of sight, the arches travelling down it from the head to the tail, the head riding above the water and looking ahead',
+  tapAbout: 'it rears up with the crest flared and three pink fireballs rise one after another out of the river behind it and climb out of sight',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, i, WY = 68, N = 34, sp = [], u, rear = 0;
+    if (q >= 0) rear = M.spring(seg(q, 0, 0.28)) * (1 - ez(seg(q, 0.7, 0.96)));
+    for (i = 0; i <= N; i++) {
+      u = i / N;
+      var env = Math.min(1, 0.25 + u * 1.4) * (1 - 0.9 * ez(seg(u, 0.72, 0.96))), neck = ez(seg(u, 0.74, 1)) * (30 + 13 * rear);
+      sp.push([6 + 69 * u - 7 * bump(seg(u, 0.7, 1)) + 3 * ez(seg(u, 0.85, 1)), WY - 3 - neck + 13 * env * Math.sin(TAU * (1.5 * u - t))]);
+    }
+    var W = function (v) { return v < 0.78 ? 2.6 + 8.6 * Math.pow(v / 0.78, 0.8) : 11.2 - 1.6 * (v - 0.78) / 0.22; };
+    var hd = sp[N], ang = -0.12 - 0.2 * rear + 0.05 * M.wave(t, 1, 0.2);
+    nagaBody(p, sp, W, { gl: M.frac(1 - t), step: 3, fill: 'green', noRidge: 10 });
+    p.at(hd[0] + 1, hd[1] + 1, ang, p.small ? 1.0 : 0.82, function () { nagaHead(p, { open: 0.16 + 0.1 * M.wave(t, 1, 0.3) + 0.5 * rear, blink: bump(seg(t, 0.72, 0.76)), tongue: bump(seg(M.frac(t + 0.3), 0.1, 0.4)) * (1 - rear), flare: 0.4 + 0.25 * M.wave(t, 2, 0.1) + 0.8 * rear, t: t, crest: 5 }); });
+    /* the fireballs rise out of the river behind it, one after another */
+    if (q >= 0) for (i = 0; i < 3; i++) {
+      var f = seg(q, 0.18 + i * 0.16, 0.86 + i * 0.05), fx = 22 + i * 17 + 2 * Math.sin(f * 9 + i), fy = WY + 4 - 105 * M.easeIn(f) * 0.9 - 20 * ez(f), fr = 4.4 * (1 - 0.3 * f);
+      if (f > 0 && f < 1) { p.circle(fx, fy, fr * 2, { fill: 'rose', line: false, alpha: 0.28 }); p.circle(fx, fy, fr, { fill: 'rose', w: 0.7 }); p.circle(fx, fy, fr * 0.45, { fill: 'yellow', line: false }); }
+    }
+    /* the river over it: what is under the surface is seen through it */
+    var top = sinew(1, 119, WY, 1.2, 28, t * 2);
+    p.path('M' + top.map(function (v) { return v[0].toFixed(1) + ' ' + v[1].toFixed(1); }).join(' L') + ' L119 97 Q60 101 1 97 Z', { fill: 'sky', line: false, alpha: 0.46 });
+    p.curve(top, { ink: 'blue', w: 0.8 });
+    if (!p.small) {
+      p.curve(sinew(8, 112, WY + 11, 1, 32, -t * 2 + 0.3), { ink: 'blue', w: 0.45, detail: true });
+      for (i = 0; i < N; i++) { var a = sp[i], b = sp[i + 1]; if ((a[1] - WY) * (b[1] - WY) < 0 && b[0] < hd[0] - 6) { var cx = a[0] + (b[0] - a[0]) * (WY - a[1]) / (b[1] - a[1]); p.arc(cx, WY + 0.5, 5.5, Math.PI + 0.4, TAU - 0.4, { ry: 2, w: 0.6, ink: 'blue' }); } }
+      if (q >= 0) for (i = 0; i < 3; i++) { var g = seg(q, 0.18 + i * 0.16, 0.5 + i * 0.16); if (g > 0 && g < 1) p.arc(22 + i * 17, WY + 3, 3 + 11 * g, 0.2 + TAU * ez(seg(g, 0.5, 1)), 0.2 + TAU * ez(seg(g, 0, 0.7)), { ry: 1.2 + 2.4 * g, w: 0.6, ink: 'blue' }); }
+    }
+  }
+});
+
+/* ---------------------------------------------------------------- unalom
+   อุณาโลม. The sacred yant mark, drawn as the master draws it: one unbroken line, begun at the middle of a coil, winding out, climbing in
+   diminishing S-curves and going straight to a point, with three dots set above. The line is gold under thin ink, the way a rod leaves a mark
+   with a halo of gold behind it. */
+function yantPoly(cx, by, R, h) {
+  var P = [], i, A = TAU * 2.25, n = 60, a, r, ang;
+  for (i = 0; i <= n; i++) { a = A * i / n; r = 1.3 + (R - 1.3) * Math.pow(a / A, 0.9); ang = TAU * 0.25 - a; P.push([cx + r * Math.cos(ang), by + r * Math.sin(ang)]); }
+  var w = h / 70;
+  return P.concat(cr([[cx + R, by], [cx + R + 0.6, by - 9 * w], [cx - 12 * w, by - 23 * w], [cx + 10 * w, by - 35 * w], [cx - 6.6 * w, by - 45 * w], [cx + 3 * w, by - 52.5 * w], [cx, by - 58 * w], [cx, by - 64 * w], [cx, by - 70 * w]], 8).slice(1));
+}
+function polyLen(P) { var c = [0], i; for (i = 1; i < P.length; i++) c.push(c[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1])); return c; }
+function polyAt(P, c, u) { var want = c[c.length - 1] * M.clamp(u, 0, 1), i = 1; while (i < c.length - 1 && c[i] < want) i++; var f = (want - c[i - 1]) / ((c[i] - c[i - 1]) || 1); return [P[i - 1][0] + (P[i][0] - P[i - 1][0]) * f, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * f]; }
+var Y1 = yantPoly(35, 82, 11, 70), Y1L = polyLen(Y1);
+/* the part of the line between a and b: gold, with the thin ink over it */
+function yantLine(p, P, a, b, ink) {
+  if (b - a < 0.004) return;
+  p.span(P, a, b, { ink: 'gold', w: 2.3, cap: 'round', wob: 0.7 });
+  p.span(P, a, b, { ink: ink || 'ink', w: 0.72, wob: 0.8 });
+}
+function yantDots(p, x, y, k, kk) {
+  [[-6.6, 3.6], [0, -1.2], [6.6, 3.6]].forEach(function (d, i) {
+    var v = M.spring(M.seg(k, i * 0.2, i * 0.2 + 0.5)) * kk;
+    if (v > 0.02) { p.circle(x + d[0], y + d[1], 2.9 * v, { fill: 'gold', line: false }); p.dot(x + d[0] + 0.3, y + d[1] + 0.3, 1.5 * v, 'ink'); }
+  });
+}
+D.add('unalom', {
+  fam: 'thai', tags: ['unalom', 'yant', 'sak yant', 'sacred', 'protection', 'line', 'blessing', 'gold', 'tattoo', 'อุณาโลม', 'ยันต์', 'สักยันต์'], loop: 4, still: 0.55, ratio: 0.7, tapLen: 3, tapRest: 0.95, burst: false, tapMargin: [14, 20, 10, 20],
+  margin: [18, 16, 8, 16], about: 'the yant line is drawn up from the middle of its coil to a point, glints of gold run up it while it holds, then it is taken back from the coil, and drawn again',
+  tapAbout: 'the line is drawn once more, slowly, by an unseen hand, and three gold dots settle above its point one after another',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, P = Y1, c = Y1L, i;
+    /* the idle line: drawn 0 → 0.4, held, taken back from the coil 0.78 → 0.96 */
+    var iu = ez(seg(t, 0.02, 0.4)), ib = ez(seg(t, 0.78, 0.96)), a = ib, b = iu * (1 - 0 * ib), dots = ez(seg(t, 0.42, 0.52)) * (1 - ez(seg(t, 0.74, 0.82)));
+    if (q >= 0) {
+      var r = ez(seg(q, 0, 0.12)), d = ez(seg(q, 0.14, 0.76));
+      if (q < 0.14) { a = Math.max(a, r * b); } else { a = 0; b = d; }
+      dots = Math.max(0, seg(q, 0.76, 1)) > 0 ? 1 : dots * (1 - r);
+      yantLine(p, P, a, b);
+      var kk = seg(q, 0.76, 1);
+      if (kk > 0) yantDots(p, 35, 6, kk, 1);
+      var nib = polyAt(P, c, b);
+      if (q >= 0.14 && q < 0.78) { p.dot(nib[0], nib[1], 1.7, 'gold'); p.circle(nib[0], nib[1], 3.6 + 0.8 * M.wave(q, 6), { ink: 'gold', w: 0.5 }); }
+      return;
+    }
+    yantLine(p, P, a, b);
+    var held = seg(t, 0.4, 0.78), g = seg(t, 0.4, 0.8) * 1.12;
+    if (held > 0 && held < 1 && b > 0.99) { p.span(P, Math.max(0, g - 0.09), Math.min(1, g), { ink: 'yellow', w: 1.4, glow: 0.7, cap: 'round' }); }
+    if (b < 0.995 && b > 0.01) { var nb = polyAt(P, c, b); p.dot(nb[0], nb[1], 1.6, 'gold'); }
+    if (dots > 0.01) yantDots(p, 35, 6, M.clamp(seg(t, 0.42, 0.62), 0, 1), M.clamp(dots * 1.2, 0, 1));
+  }
+});
+
+/* ---------------------------------------------------------------- unalom-lotus */
+var Y2 = yantPoly(35, 62, 7, 52), Y2L = polyLen(Y2);
+function lotusPetal(p, x, y, a, len, wid, fill) {
+  p.at(x, y, a, 1, function () {
+    p.path('M0 0 C' + (-wid) + ' ' + (-len * 0.25) + ' ' + (-wid * 0.9) + ' ' + (-len * 0.72) + ' 0 ' + (-len) + ' C' + (wid * 0.9) + ' ' + (-len * 0.72) + ' ' + wid + ' ' + (-len * 0.25) + ' 0 0 Z', { fill: fill, w: 0.85 });
+    p.path('M0 ' + (-len * 0.1) + ' C-0.8 ' + (-len * 0.4) + ' 0 ' + (-len * 0.66) + ' 0 ' + (-len * 0.84), { w: 0.3, detail: true });
+  });
+}
+D.add('unalom-lotus', {
+  fam: 'thai', tags: ['unalom', 'yant', 'lotus', 'bua', 'sacred', 'blessing', 'bloom', 'gold', 'purity', 'อุณาโลม', 'บัว', 'ยันต์'], loop: 4, still: 0.55, ratio: 0.7, tapLen: 3, tapRest: 0.95, burst: 'petal', burstAt: [35, 78], burstN: 5, burstSpread: 3, burstDelay: 0.05, tapMargin: [14, 25, 10, 25],
+  margin: [18, 16, 8, 16], about: 'a small lotus opens as the yant is drawn up out of its heart, the lotus holds open while gold glints run up the line, then the line is taken back and the petals close',
+  tapAbout: 'the lotus flares wide with a spring while the line is drawn again, slowly, and three gold dots settle at its point',
+  draw: function (p, t, s) {
+    var seg = M.seg, ez = M.ease, bump = M.bump, q = s.tap, P = Y2, c = Y2L, i;
+    var iu = ez(seg(t, 0.02, 0.4)), ib = ez(seg(t, 0.78, 0.96)), a = ib, b = iu, dots = ez(seg(t, 0.42, 0.52)) * (1 - ez(seg(t, 0.74, 0.82)));
+    var op = ez(seg(t, 0, 0.36)) * (1 - ez(seg(t, 0.8, 0.98))) + 0.05 * M.wave(t, 1, 0.2) * ez(seg(t, 0.36, 0.5));
+    var nib = null, dk = 0;
+    if (q >= 0) {
+      var r = ez(seg(q, 0, 0.12)), d = ez(seg(q, 0.14, 0.76));
+      op = M.lerp(op, 1.12 * M.spring(seg(q, 0.02, 0.45)) * (1 - ez(seg(q, 0.9, 1)) * 0.1), ez(seg(q, 0, 0.1)));
+      if (q < 0.14) { a = Math.max(a, r * b); } else { a = 0; b = d; }
+      dk = seg(q, 0.76, 1);
+      if (q >= 0.14 && q < 0.78) nib = polyAt(P, c, b);
+    }
+    p.ellipse(35, 92, 27, 4.6, { fill: 'leaf', w: 0.9 });
+    p.path('M35 92 L58 91', { w: 0.4, detail: true });
+    /* the back petals, then the line rising from the heart, then the front petals over its foot */
+    [-1, 1].forEach(function (d) { lotusPetal(p, 35, 88, d * (0.12 + 1.15 * op), 26, 7.6, 'pink'); });
+    [-1, 1].forEach(function (d) { lotusPetal(p, 35, 88, d * (0.06 + 0.74 * op), 31, 8.2, 'white'); });
+    lotusPetal(p, 35, 88, 0, 33 + 1.5 * op, 7.6, 'pink');
+    p.ellipse(35, 74, 5.2, 3.2, { fill: 'yellow', w: 0.7 });
+    if (q >= 0) {
+      yantLine(p, P, a, b);
+      if (dk > 0) yantDots(p, 35, 4, dk, 1);
+      if (nib) { p.dot(nib[0], nib[1], 1.7, 'gold'); p.circle(nib[0], nib[1], 3.6 + 0.8 * M.wave(q, 6), { ink: 'gold', w: 0.5 }); }
+    } else {
+      yantLine(p, P, a, b);
+      var held = seg(t, 0.4, 0.78), g = seg(t, 0.4, 0.8) * 1.12;
+      if (held > 0 && held < 1 && b > 0.99) p.span(P, Math.max(0, g - 0.09), Math.min(1, g), { ink: 'yellow', w: 1.4, glow: 0.7, cap: 'round' });
+      if (b < 0.995 && b > 0.01) { var nb = polyAt(P, c, b); p.dot(nb[0], nb[1], 1.6, 'gold'); }
+      if (dots > 0.01) yantDots(p, 35, 4, M.clamp(seg(t, 0.42, 0.62), 0, 1), M.clamp(dots * 1.2, 0, 1));
+    }
+    [-1, 1].forEach(function (d) { lotusPetal(p, 35, 88, d * (0.06 + 0.5 * op), 26, 8.4, 'pink'); });
+  }
+});
+
+})(Dingbats);
+
+/* Tigers (เสือ): one tiger, head-on, stalking, pouncing, roaring, napping, as a cub, and the twin tigers of a sak yant. */
+(function (D) {
+'use strict';
+var M = D.math, TAU = M.TAU, PI = Math.PI, W = M.wave, seg = M.seg, eo = M.easeOut, ei = M.easeIn, bump = M.bump, lerp = M.lerp, clamp = M.clamp, frac = M.frac, ease = M.ease, sp = M.spring;
+var COAT = 'orange', FAR = '#D5661A', DARK = 'black', MOUTH = '#B8323A';
+
+/* a window of the loop that starts at a and lasts d, wrapping past the seam: 0..1 inside, -1 outside */
+function win(t, a, d) { var u = frac(t - a) / d; return u < 1 ? u : -1; }
+function pulse(t, a, d) { var u = win(t, a, d); return u < 0 ? 0 : bump(u); }
+function bez(a, b, c, d, n) {
+  var o = [], i, u, v;
+  for (i = 0; i <= n; i++) { u = i / n; v = 1 - u; o.push([v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]]); }
+  return o;
+}
+/* the left and right edges of a ribbon along a spine, w(s) wide at s in 0..1, from point i0 to i1 */
+function edges(sp, w, i0, i1) {
+  var n = sp.length, L = [], R = [], i, a, b, d, h;
+  for (i = i0; i <= i1; i++) {
+    a = sp[Math.max(0, i - 1)]; b = sp[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; h = w(i / (n - 1)) / 2;
+    L.push([sp[i][0] - (b[1] - a[1]) / d * h, sp[i][1] + (b[0] - a[0]) / d * h]); R.push([sp[i][0] + (b[1] - a[1]) / d * h, sp[i][1] - (b[0] - a[0]) / d * h]);
+  }
+  return [L, R];
+}
+/* the far end of a ribbon, rounded: points around e from the left edge to the right */
+function roundEnd(e, Lend, h, m) {
+  var a0 = Math.atan2(Lend[1] - e[1], Lend[0] - e[0]), o = [], k;
+  m = m || 6;
+  for (k = 1; k < m; k++) o.push([e[0] + Math.cos(a0 - PI * k / m) * h, e[1] + Math.sin(a0 - PI * k / m) * h]);
+  return o;
+}
+/* a smooth closed ribbon along a spine (tails, necks, a trunk of fur) */
+function tube(p, sp, w, o) {
+  var n = sp.length, LR = edges(sp, w, 0, n - 1), cap = roundEnd(sp[n - 1], LR[0][n - 1], w(1) / 2);
+  return p.curve(LR[0].concat(cap, LR[1].reverse()), Object.assign({ close: true }, o));
+}
+/* a black wedge stripe: wide where it starts, thinning to a point; a, b, c are the points it passes through */
+function wedge(p, a, b, c, w, o) {
+  var sp = [], i, u, v, LR;
+  for (i = 0; i <= 8; i++) { u = i / 8; v = 1 - u; sp.push([v * v * a[0] + 2 * v * u * b[0] + u * u * c[0], v * v * a[1] + 2 * v * u * b[1] + u * u * c[1]]); }
+  LR = edges(sp, function (s) { return w * Math.pow(1 - s, 0.8); }, 0, 8);
+  p.poly(LR[0].concat(LR[1].reverse()), Object.assign({ fill: DARK, line: false }, o || {}));
+}
+/* an amber eye with a round pupil, a lid coming down in the coat's colour: lid 0 open, 1 shut; once shut, happy bends it from a sleepy droop into a smile-arch */
+function eye(p, x, y, r, lid, lx, ly, happy, pupil) {
+  if (lid > 0.92 || happy > 0.3) { p.path('M' + (x - r) + ' ' + (y + 0.5) + ' Q' + x + ' ' + (y + r * lerp(0.8, -1.15, happy || 0)) + ' ' + (x + r) + ' ' + (y + 0.5), { w: 1.15, cap: 'round' }); return; }
+  p.circle(x, y, r, { fill: 'gold', w: 0.85 });
+  p.circle(x + lx * r * 0.28, y + ly * r * 0.28, r * 0.56 * (pupil || 1), { fill: DARK, line: false });
+  p.dot(x + lx * r * 0.28 - r * 0.2, y + ly * r * 0.28 - r * 0.22, r * 0.2, 'white');
+  if (lid > 0.04) {
+    var yc = y - r + 2 * r * lid, hw = Math.sqrt(Math.max(0, r * r - (yc - y) * (yc - y)));
+    p.path('M' + (x - hw - 0.4) + ' ' + yc + ' A' + r + ' ' + r + ' 0 ' + (lid > 0.5 ? 1 : 0) + ' 1 ' + (x + hw + 0.4) + ' ' + yc + ' Z', { fill: COAT, w: 0.9 });
+  }
+}
+
+/* ---------------------------------------------------------------------------------------------
+   the face, head-on
+   --------------------------------------------------------------------------------------------- */
+/* the head's outline, as path data: dj drops the jaw, f flares the cheek ruffs */
+function faceShape(dj, f) {
+  var R = [['C', 64, 14, 78, 19, 85, 29], ['C', 89, 35, 90, 41, 90, 46], ['L', 97 + f, 52], ['L', 91, 56], ['L', 98 + f, 65], ['L', 91, 67], ['L', 95 + f, 77 + dj * 0.4], ['L', 86, 76 + dj * 0.5], ['C', 80, 86 + dj, 66, 91 + dj, 50, 91 + dj]];
+  var d = 'M50 14', i, c, k;
+  for (i = 0; i < R.length; i++) { c = R[i]; d += c[0]; for (k = 1; k < c.length; k += 2) d += (k > 1 ? ' ' : '') + c[k] + ' ' + c[k + 1]; }
+  /* the left half, walking back up: the same points mirrored */
+  d += 'C34 ' + (91 + dj) + ' 20 ' + (86 + dj) + ' 14 ' + (76 + dj * 0.5) + 'L' + (5 - f) + ' ' + (77 + dj * 0.4) + 'L9 67L' + (2 - f) + ' 65L9 56L' + (3 - f) + ' 52L10 46C10 41 11 35 15 29C22 19 36 14 50 14Z';
+  return d;
+}
+function earF(p, x, y, d, rot) {
+  p.pivot(x, y + 10, rot, 1, function () {
+    p.path('M' + (x - 11) + ' ' + (y + 9) + ' C' + (x - 13) + ' ' + (y - 3) + ' ' + (x - 7) + ' ' + (y - 12) + ' ' + x + ' ' + (y - 12) + ' C' + (x + 7) + ' ' + (y - 12) + ' ' + (x + 13) + ' ' + (y - 3) + ' ' + (x + 11) + ' ' + (y + 9) + ' Z', { fill: COAT, w: 1.05 });
+    p.path('M' + (x - 6.5) + ' ' + (y + 8) + ' C' + (x - 8) + ' ' + y + ' ' + (x - 4.5) + ' ' + (y - 7) + ' ' + x + ' ' + (y - 7.5) + ' C' + (x + 4.5) + ' ' + (y - 7) + ' ' + (x + 8) + ' ' + y + ' ' + (x + 6.5) + ' ' + (y + 8) + ' Z', { fill: 'cream', w: 0.5 });
+    p.path('M' + (x - 3.5) + ' ' + (y + 6) + ' C' + (x - 4) + ' ' + (y + 1) + ' ' + (x - 2) + ' ' + (y - 3) + ' ' + x + ' ' + (y - 3.4), { w: 0.4, detail: true, ink: 'brown' });
+  });
+}
+/* the face head-on, drawn in its own 100 x 100: o.op yawn 0..1, o.lid, o.happy (shut as a smile), o.look (the pupils, one number or [left, right]), o.earL, o.earR, o.cub (bigger eyes, for a cub) */
+function faceFront(p, t, o) {
+  var op = o.op || 0, lid = o.lid || 0, happy = o.happy || 0, cub = o.cub || 0, dj = 11 * op, fl = 5 * op, i, shape = faceShape(dj, fl);
+      earF(p, 24, 24, -1, -0.28 - o.earL); earF(p, 76, 24, 1, 0.28 + o.earR);
+      p.path(shape, { fill: 'white', line: false });
+      p.clip(shape, function () {
+        p.path('M-4 -4 L104 -4 L104 46 L90 46 C80 50 70 55 60 58 L60 72 L40 72 L40 58 C30 55 20 50 10 46 L-4 46 Z', { fill: COAT, line: false });
+        [-1, 1].forEach(function (d) {
+          var X = function (x) { return 50 + d * (x - 50); };
+          p.ellipse(X(32.5), 36 - 0.5, 6.4, 2.9, { fill: 'white', line: false, rot: d * 0.32 });
+          wedge(p, [X(91), 57], [X(84), 57.5], [X(75), 60], 4, {}); wedge(p, [X(91), 67], [X(85), 66], [X(77), 68], 3.6, {});
+          wedge(p, [X(91), 42], [X(80), 41.5], [X(71), 44], 4.4, {}); wedge(p, [X(88), 33], [X(80), 34], [X(72), 37.5], 4.2, {});
+          wedge(p, [X(79), 21], [X(75), 25], [X(70), 29.5], 4.2, {}); wedge(p, [X(61), 14], [X(58), 20], [X(55.6), 28], 4.6, {});
+          wedge(p, [X(25.5), 47], [X(20), 51], [X(14), 56], 3.4, {});
+        });
+        p.ellipse(50, 73 + dj * 0.2, 21, 15 + dj * 0.4, { fill: 'white', line: false });
+        wedge(p, [50, 13], [50, 21], [50, 31.5], 6, {});
+      });
+      p.path(shape, { w: 1.15 });
+      /* whisker pads, spots, whiskers */
+      p.path('M30 66 C30 77 43 78 50 72', { w: 0.45, detail: true }); p.path('M70 66 C70 77 57 78 50 72', { w: 0.45, detail: true });
+      [[36, 66], [41, 64], [44.5, 67], [36, 71], [41.5, 70]].forEach(function (c) { p.dot(c[0], c[1] + dj * 0.2, 0.95, DARK); p.dot(100 - c[0], c[1] + dj * 0.2, 0.95, DARK); });
+      for (i = 0; i < 3; i++) [-1, 1].forEach(function (d) {
+        var wv = 2.4 * W(t, 2, i * 0.12 - d * 0.1) * (1 - 0.7 * Math.min(1, op * 4)) - 8 * op, y0 = 67 + i * 3.2 + dj * 0.2;
+        p.curve([[50 + d * 15, y0], [50 + d * 27, y0 + (i - 1) * 3.4 + wv * 0.4], [50 + d * 41 + d * 4 * op, y0 + (i - 1) * 6 + wv]], { w: 0.4, detail: true });
+      });
+      /* eyes */
+      [-1, 1].forEach(function (d) {
+        var x = 50 + d * 17, er = 6 + 1.6 * cub; eye(p, x, 45 + 2 * cub, er, lid, typeof o.look === 'number' ? o.look : (d < 0 ? o.look[0] : o.look[1]), o.ly == null ? 0.2 : o.ly, happy, o.pupil);
+        if (lid < 0.9) p.path('M' + (x - d * (er + 1.6)) + ' ' + (45 + 2 * cub) + ' C' + (x - d * er) + ' ' + (38.5 + 2 * cub - cub) + ' ' + (x + d * 2) + ' ' + (37.5 + 2 * cub - cub) + ' ' + (x + d * (er + 1)) + ' ' + (41.5 + 2 * cub), { w: 0.95, cap: 'round' });
+        p.path('M' + (50 + d * 9) + ' 46 C' + (50 + d * 7.5) + ' 50 ' + (50 + d * 6) + ' 52.5 ' + (50 + d * 5.5) + ' 54', { w: 0.45, detail: true });
+      });
+      /* nose and mouth */
+      p.path('M42 54.5 C42 51 58 51 58 54.5 C58 58.5 53 62.5 50 63.5 C47 62.5 42 58.5 42 54.5 Z', { fill: 'rose', w: 0.85 });
+      p.path('M45 54 C46 53 48 52.8 49 53', { w: 0.4, detail: true, ink: 'white' });
+      if (op < 0.06) {
+        p.path('M50 63.5 L50 68.5 M50 68.5 C48 72.5 43 73.5 39.5 70 M50 68.5 C52 72.5 57 73.5 60.5 70', { w: 0.75 });
+      } else {
+        var by = 68 + 24 * op + dj * 0.3, tq = 3 + 8 * op, ww = 3.5 * op, md = 'M' + (39 - ww) + ' 70 C' + (41 - ww * 0.6) + ' 66 46 67.5 50 68.5 C54 67.5 ' + (59 + ww * 0.6) + ' 66 ' + (61 + ww) + ' 70 C' + (63 + ww) + ' ' + (by - 12) + ' 58 ' + by + ' 50 ' + by + ' C42 ' + by + ' ' + (37 - ww) + ' ' + (by - 12) + ' ' + (39 - ww) + ' 70 Z';
+        p.path(md, { fill: MOUTH, w: 0.9 });
+        p.clip(md, function () {
+          p.ellipse(50, by - 1.5, 10 + ww, tq, { fill: 'pink', w: 0.6 }); p.line(50, by - tq * 1.1, 50, by - 1.5, { w: 0.4, detail: true });
+        });
+        p.path('M42.5 68.4 L46.2 68.4 L44.4 ' + (68.4 + 9 * op) + ' Z', { fill: 'white', w: 0.5 }); p.path('M53.8 68.4 L57.5 68.4 L55.6 ' + (68.4 + 9 * op) + ' Z', { fill: 'white', w: 0.5 });
+        p.path('M43.6 ' + by + ' L46 ' + by + ' L44.8 ' + (by - 5.5 * op) + ' Z', { fill: 'white', w: 0.5 }); p.path('M54 ' + by + ' L56.4 ' + by + ' L55.2 ' + (by - 5.5 * op) + ' Z', { fill: 'white', w: 0.5 });
+      }
+}
+
+D.add('tiger-face', {
+  fam: 'tiger', tags: ['tiger', 'big cat', 'face', 'stripes', 'whiskers', 'zoo', 'jungle', 'animal', 'wild', 'year of the tiger', 'เสือ', 'หน้าเสือ'], loop: 3, still: 0.1, tapLen: 2, tapRest: 0.55,
+  burst: false, margin: [10, 24, 6, 24], tapMargin: [14, 32, 10, 32],
+  about: 'blinks, the ears twitch one after the other, the whiskers flutter and the eyes drift', tapAbout: 'a big friendly yawn-roar: the jaw drops, the eyes squeeze shut, the ruffs flare and sound arcs go out',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, op = tap ? eo(seg(q, 0.04, 0.28)) * (1 - ei(seg(q, 0.74, 0.96))) : 0, hold = tap ? bump(seg(q, 0.04, 0.96)) : 0;
+    var lid = tap ? clamp(op * 3, 0, 1) : Math.max(pulse(t, 0.56, 0.07), pulse(t, 0.64, 0.06)), happy = tap ? ease(seg(op, 0.45, 1)) : 0;
+    var earL = 0.2 * pulse(t, 0.3, 0.12) + (tap ? -0.25 * hold : 0), earR = 0.2 * pulse(t, 0.37, 0.12) + (tap ? -0.25 * hold : 0);
+    var look = 0.7 * W(t, 1, 0.1), sway = tap ? -0.025 * op : 0.03 * W(t, 1, 0.2), dj = 9 * op, fl = 5 * op, i, d;
+    var shape = faceShape(dj, fl);
+    p.pivot(50, 92, sway, [1 + 0.012 * W(t, 2) + 0.03 * op, 1 + 0.012 * W(t, 2, 0.25) - 0.02 * op], function () {
+      p.move(0, -4 * op);
+      p.move(0, 0);
+      faceFront(p, t, { op: op, lid: lid, happy: happy, look: look, earL: earL, earR: earR });
+    });
+    /* sound arcs on a yawn, drawn and taken back */
+    if (tap) [0, 1, 2].forEach(function (k) {
+      var a = seg(q, 0.2 + k * 0.1, 0.5 + k * 0.1), b = ei(seg(q, 0.52 + k * 0.1, 0.9)), r = 6 + k * 6;
+      [-1, 1].forEach(function (d) { p.span('M' + (50 + d * (50 + r * 0.6)) + ' ' + (50 - r * 0.9) + ' C' + (50 + d * (56 + r)) + ' ' + (50 - r * 0.4) + ' ' + (50 + d * (56 + r)) + ' ' + (50 + r * 0.4) + ' ' + (50 + d * (50 + r * 0.6)) + ' ' + (50 + r * 0.9), b, eo(a), { w: 0.7 }); });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------------------------------------
+   the head in profile, facing right; drawn about the eye at (0, 0), nose tip at x = 38, about 60 long, crown at y = -27.
+   o: open (0..1, the jaw swung down about the hinge), ear (radians), lid (0 open .. 1 shut), snarl (0..1, wrinkles on the nose),
+   wv (whiskers' wave), flare (the ruff blown out), sleep (the eye a closed arc)
+   --------------------------------------------------------------------------------------------- */
+var UPPER = 'M-22 7 C-27 -3 -25 -17 -13 -24 C-5 -28 8 -27 16 -21 C22 -17 26 -13 29 -9.5 C32 -7 36 -6.5 37.5 -2 C38.5 1.5 36.5 5 32.5 6 C30.5 7.6 27.5 8 24.5 7.6 C17 8 9 8.5 3 8 C-4 9.5 -14 11 -22 7 Z';
+var JAW = 'M3 8 C11 7.5 19 7.5 26 7.5 C31 8 32.5 13 29.5 17.5 C24 22.5 12 22.5 4 20 C-2 18.5 -6 15 -6 9 Z';
+function headSide(p, o) {
+  var op = o.open || 0, ang = 0.9 * op, wv = o.wv || 0, fl = o.flare || 0, sn = o.snarl || 0, small = p.small, lid = o.lid || 0;
+  /* the ear, behind the skull */
+  p.pivot(-10, -20, o.ear || 0, 1, function () {
+    p.path('M-20 -17 C-22.5 -29 -16 -37 -9 -36 C-2 -35 2 -27 -1 -18 Z', { fill: COAT, w: 1.05 });
+    p.path('M-16.5 -18.5 C-18 -27 -13 -32.5 -9 -32 C-5 -31.6 -3 -26 -4 -18.5 Z', { fill: 'cream', w: 0.45 });
+    p.path('M-19.5 -17.5 C-21.5 -28 -16 -35.5 -9 -35 C-2.5 -34.5 1 -27 -1.2 -18.5', { w: 1.15 });
+  });
+  /* the inside of the mouth, the lower jaw with its tongue and fang, swung open */
+  if (op > 0.03) {
+    var tipx = 30 * Math.cos(ang) + 0.5 * Math.sin(ang), tipy = 8 + 30 * Math.sin(ang) - 0.5 * Math.cos(ang);
+    p.path('M2 8 L31 7.6 L' + tipx + ' ' + tipy + ' Z', { fill: MOUTH, line: false });
+    p.path('M22 7.5 L30 7.5 L26.6 ' + (7.5 + 14 * op) + ' Z', { fill: 'white', w: 0.65 });
+    if (!small) p.path('M7 10 C13 12.4 20 12.4 26 11', { w: 0.4, detail: true, ink: 'brown' });
+    p.pivot(0, 8, ang, 1, function () {
+      p.path('M3.5 8.4 C8 3.2 18 2.2 27 5.5 C29 8 23 11.8 13 11.8 C7 11.8 4.4 10.4 3.5 8.4 Z', { fill: 'pink', w: 0.65 });
+      p.path('M8 8.2 C14 6.8 21 6.6 25.5 7.2', { w: 0.4, detail: true, ink: 'rose' });
+      p.path(JAW, { fill: 'white' });
+      p.path('M23.5 7.8 L30 7.8 L27.4 ' + (7.8 - 10 * op) + ' Z', { fill: 'white', w: 0.65 });
+      p.path('M28 9 C30 11.4 29.6 13.6 27.6 15', { w: 0.4, detail: true });
+    });
+  } else {
+    p.path(JAW, { fill: 'white' });
+  }
+  /* the head */
+  p.path(UPPER, { fill: COAT, line: false });
+  p.clip(UPPER, function () {
+    p.path('M44 -3.5 C36 -4 26 -3.5 18 -1 C9 1.6 -2 5 -30 9 L-30 30 L44 30 Z', { fill: 'white', line: false });
+    p.ellipse(7, -17.6, 5.2, 2.2, { fill: 'white', line: false, rot: -0.2 });
+    wedge(p, [-6, -28], [-5, -22], [-4.2, -15], 4.2, {}); wedge(p, [2.5, -29], [3.4, -23], [3.6, -16.5], 4.2, {}); wedge(p, [11, -26.5], [11, -22], [10, -17.5], 3.6, {});
+    wedge(p, [-27, -12], [-19, -11], [-10, -7.2], 4.4, {}); wedge(p, [-27, -1], [-19, -1], [-11, 1.6], 4, {}); wedge(p, [-26, -21], [-19, -19], [-13, -15], 3.6, {});
+  });
+  p.path(UPPER, { w: 1.1 });
+  /* eye */
+  if (o.sleep || lid > 0.93) { p.path('M1.5 -7 Q6 -2.5 10.5 -7', { w: 1.15, cap: 'round' }); p.path('M0 -7.5 C-2 -8.5 -3 -9.5 -3.4 -10.5', { w: 0.5, detail: true }); }
+  else {
+    p.circle(6, -7.5, 4.7, { fill: 'gold', w: 0.8 });
+    p.circle(6.9, -7.4, 2.7 * (o.pupil || 1), { fill: DARK, line: false }); p.dot(7.7, -8.8, 0.9, 'white');
+    if (lid > 0.04) { var yc = -7.5 - 4.7 + 9.4 * lid, hw = Math.sqrt(Math.max(0, 4.7 * 4.7 - (yc + 7.5) * (yc + 7.5))); p.path('M' + (6 - hw - 0.4) + ' ' + yc + ' A4.7 4.7 0 ' + (lid > 0.5 ? 1 : 0) + ' 1 ' + (6 + hw + 0.4) + ' ' + yc + ' Z', { fill: COAT, w: 0.8 }); }
+    p.path('M0 -7 C2 -12.5 8.5 -13.5 12 -10', { w: 1 + 0.5 * sn, cap: 'round' });
+  }
+  p.path('M11 -5 C13 -2 14 0 14.5 2.6', { w: 0.5, detail: true });
+  if (sn > 0.05 && !small) [[22, -11, 1], [25, -9.4, 0.8], [28, -7.4, 0.6]].forEach(function (c) { p.path('M' + c[0] + ' ' + c[1] + ' C' + (c[0] + 1.6) + ' ' + (c[1] + 2) + ' ' + (c[0] + 1.4) + ' ' + (c[1] + 3.6) + ' ' + (c[0] - 0.4) + ' ' + (c[1] + 4.6), { w: 0.45 * c[2] + 0.2, detail: true }); });
+  /* nose, spots, whiskers */
+  p.path('M32.5 -7.5 C37 -8 40 -3.5 38 0.6 C37 2.8 34.6 3.6 32.6 2.6 C31 0.2 31.4 -5 32.5 -7.5 Z', { fill: 'rose', w: 0.75 });
+  p.dot(35.4, 0, 0.8, DARK);
+  [[24, 2], [27, 3], [21, 3.6], [24.5, 5.2], [18, 5.2]].forEach(function (c) { p.dot(c[0], c[1], 0.7, DARK); });
+  if (op < 0.03) p.path('M33 3.4 C32.6 5.4 31.6 6.4 29.6 6.9 C25 8.2 14 8.4 4 8 C3 7.6 2.2 6.8 1.6 5.8', { w: 0.7 });
+  else p.path('M33 3.4 C32.6 5.4 31.6 6.4 29.6 6.9', { w: 0.7 });
+  [[-9, 2], [3, 1], [12, 0]].forEach(function (c, i) {
+    var w = (2.2 * W(o.t == null ? 0 : o.t, 2, i * 0.12) + wv) * (i + 1) / 3, x0 = 20, y0 = 1.5 + i * 2;
+    p.curve([[x0, y0], [x0 + 11, y0 + c[0] * 0.5 + w * 0.3], [x0 + 23, y0 + c[0] + w]], { w: 0.4, detail: true });
+  });
+  /* the ruff, tufts blown back */
+  var rf = fl * 4;
+  p.path('M4 4 C-2 4.5 -8 3.5 -16 4.5 L' + (-26 - rf) + ' ' + (6 + rf * 0.2) + ' L' + (-20.5 - rf * 0.3) + ' 11 L' + (-27.5 - rf) + ' ' + (17 + rf * 0.4) + ' L-18.5 17 L' + (-22 - rf * 0.5) + ' ' + (24 + rf * 0.4) + ' L-11 21 L' + (-12 - rf * 0.3) + ' ' + (28 + rf * 0.3) + ' L-2 20 C3 17 6 12 6 8 Z', { fill: 'white', w: 1 });
+  wedge(p, [-25 - rf, 8], [-20, 9], [-13, 8.6], 2.8, {}); wedge(p, [-26.5 - rf, 16], [-21, 15.4], [-14, 13.8], 2.8, {}); wedge(p, [-20 - rf * 0.4, 23], [-15, 21.4], [-9, 18.4], 2.6, {});
+}
+
+/* an arc of a circle as path data, a0 to a1 clockwise (y down) */
+function arcD(cx, cy, r, a0, a1) { return 'M' + (cx + Math.cos(a0) * r) + ' ' + (cy + Math.sin(a0) * r) + ' A' + r + ' ' + r + ' 0 0 1 ' + (cx + Math.cos(a1) * r) + ' ' + (cy + Math.sin(a1) * r); }
+
+/* the roar: head and shoulders. The mouth swings wide, holds and trembles, and closes; the sound goes out in arcs that are
+   drawn and taken back. Tap: a bigger roar, the head thrown back, ruff blown out, whiskers swept, the whole bust shaking. */
+D.add('tiger-roar', {
+  fam: 'tiger', tags: ['tiger', 'roar', 'big cat', 'fangs', 'growl', 'loud', 'brave', 'angry', 'wild', 'jungle', 'เสือ', 'คำราม'], loop: 3, still: 0.38, tapLen: 2, tapRest: 0.4,
+  burst: 'leaf', burstAt: [50, 0], burstN: 4, burstSpread: 3.6, burstDelay: 0.2, burstGravity: 30, margin: [14, 30, 2, 10], tapMargin: [30, 44, 2, 12],
+  about: 'the mouth swings wide, holds and trembles, and closes; sound arcs go out, drawn and taken back', tapAbout: 'a bigger roar: head thrown back, ruff blown out, whiskers swept back, the bust shaking, leaves knocked loose',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, big = tap ? eo(seg(q, 0.02, 0.18)) * (1 - ei(seg(q, 0.7, 0.96))) : 0;
+    var op = Math.max(ease(seg(t, 0.08, 0.22)) * (1 - ease(seg(t, 0.66, 0.82))), big), trem = op * (0.5 + big) * Math.sin(TAU * 11 * t) * (tap ? Math.sin(TAU * 7 * q) : 1);
+    var rot = -0.12 * op - 0.2 * big + 0.015 * W(t, 1), k = 1.2, shake = tap ? 0.9 * big * Math.sin(TAU * 9 * q) : 0;
+    var O = [46, 50], i, a0, a1;
+    p.move(shake, 0);
+    /* neck and shoulders */
+    var body = 'M-8 104 C-8 80 0 62 12 50 C18 44 24 42 31 42 L45 68 C51 76 56 90 58 104 Z';
+    p.pivot(30, 100, 0.012 * W(t, 1, 0.3) + 0.02 * big, [1, 1 + 0.01 * W(t, 2) + 0.015 * big], function () {
+      p.path(body, { fill: COAT, line: false });
+      p.clip(body, function () {
+        p.path('M38 62 C50 68 57 86 62 110 L30 110 Z', { fill: 'white', line: false });
+        wedge(p, [-4, 62], [8, 62], [18, 66.5], 6, {}); wedge(p, [-6, 75], [7, 73.5], [20, 78], 6.5, {}); wedge(p, [-6, 90], [8, 87], [21, 91], 6.5, {});
+        wedge(p, [13, 49], [18, 53], [20.5, 59], 5, {}); wedge(p, [23, 44], [26, 49], [28, 55], 4.4, {}); wedge(p, [31, 66], [37, 64], [41, 64.5], 2.4, {});
+      });
+      p.path(body, { w: 1.15 });
+      p.path('M17 68 C24 72 30 80 31 92', { w: 0.5, detail: true });
+    });
+    /* the head, tilted back about the neck */
+    p.pivot(35, 55, rot, 1, function () {
+      p.at(O[0], O[1], 0, k, function () {
+        headSide(p, { open: op + 0.03 * trem, ear: -0.12 - 0.5 * big, lid: 0.35 * op + 0.2 * big, snarl: op, wv: -3 * big + 0.8 * trem, flare: big, t: t });
+        /* sound, from the mouth */
+        for (i = 0; i < 3; i++) {
+          a0 = ei(seg(t, 0.5 + i * 0.06, 0.84)); a1 = eo(seg(t, 0.16 + i * 0.06, 0.5));
+          if (tap) { a0 = Math.min(a0, ei(seg(q, 0.55 + i * 0.05, 0.98))); a1 = Math.max(0, eo(seg(q, 0.08 + i * 0.07, 0.5))); }
+          if (a1 > a0 + 0.01) p.span(arcD(30, 14, 18 + 10 * i + 4 * big * i, -0.62, 0.62), a0, a1, { w: 0.85, ink: 'ink' });
+        }
+      });
+    });
+  }
+});
+
+/* ---------------------------------------------------------------------------------------------
+   the body in profile, facing right: legs that walk by their joints, a torso that rolls on its shoulders, a ringed tail
+   --------------------------------------------------------------------------------------------- */
+/* the middle joint of a two-bone limb from a to the target t; bend +1 swings it to the left of the way a → t */
+function ik2(a, t, l1, l2, bend) {
+  var dx = t[0] - a[0], dy = t[1] - a[1], d = Math.max(Math.hypot(dx, dy), 0.001), dd = Math.min(d, l1 + l2 - 0.05), c = (l1 * l1 - l2 * l2 + dd * dd) / (2 * dd), h = Math.sqrt(Math.max(0, l1 * l1 - c * c)), ux = dx / d, uy = dy / d;
+  return [a[0] + ux * c - uy * h * bend, a[1] + uy * c + ux * h * bend];
+}
+function rot(c, q, a) { var cs = Math.cos(a), sn = Math.sin(a), dx = q[0] - c[0], dy = q[1] - c[1]; return [c[0] + dx * cs - dy * sn, c[1] + dx * sn + dy * cs]; }
+/* Catmull-Rom through joints with a width at each, per samples a joint */
+function cr(pts, ws, per) {
+  var P = [], Wd = [], n = pts.length, i, k, u, p0, p1, p2, p3;
+  for (i = 0; i < n - 1; i++) {
+    p0 = pts[Math.max(0, i - 1)]; p1 = pts[i]; p2 = pts[i + 1]; p3 = pts[Math.min(n - 1, i + 2)];
+    for (k = 0; k < per; k++) {
+      u = k / per;
+      P.push([0.5 * (2 * p1[0] + (p2[0] - p0[0]) * u + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * u * u + (3 * p1[0] - p0[0] - 3 * p2[0] + p3[0]) * u * u * u),
+              0.5 * (2 * p1[1] + (p2[1] - p0[1]) * u + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * u * u + (3 * p1[1] - p0[1] - 3 * p2[1] + p3[1]) * u * u * u)]);
+      Wd.push(lerp(ws[i], ws[i + 1], u * u * (3 - 2 * u)));
+    }
+  }
+  P.push([pts[n - 1][0], pts[n - 1][1]]); Wd.push(ws[n - 1]);
+  return [P, Wd];
+}
+/* a limb: filled, outlined down both sides and round the paw; the top end stays open so it grows out of the body */
+function limb(p, pts, ws, fill, w, decor) {
+  var S = cr(pts, ws, 3), P = S[0], Wd = S[1], n = P.length, L = [], R = [], i, a, b, d, h, ring;
+  for (i = 0; i < n; i++) {
+    a = P[Math.max(0, i - 1)]; b = P[Math.min(n - 1, i + 1)]; d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; h = Wd[i] / 2;
+    L.push([P[i][0] - (b[1] - a[1]) / d * h, P[i][1] + (b[0] - a[0]) / d * h]); R.push([P[i][0] + (b[1] - a[1]) / d * h, P[i][1] - (b[0] - a[0]) / d * h]);
+  }
+  ring = L.concat(roundEnd(P[n - 1], L[n - 1], Wd[n - 1] / 2, 10), R.slice().reverse());
+  p.curve(ring, { fill: fill, line: false, close: true });
+  if (decor) p.clip(function () { p.curve(ring, { fill: fill, close: true }); }, decor);
+  p.curve(ring, { w: w || 1 });
+  return { P: P, L: L, R: R, n: n };
+}
+/* a stripe across a limb at s (0..1 along it), from its back edge across a fraction of its width */
+function bar(p, l, s, fr, w) {
+  var i = Math.round(s * (l.n - 1)), a = l.L[i], b = l.R[i], x = lerp(a[0], b[0], fr), y = lerp(a[1], b[1], fr), mx = lerp(a[0], b[0], fr * 0.5), my = lerp(a[1], b[1], fr * 0.5) + 1.2;
+  wedge(p, [a[0] + (a[0] - b[0]) * 0.08, a[1] + (a[1] - b[1]) * 0.08], [mx, my], [x, y + 2.2], w, {});
+}
+/* where a foot is in its step: ph 0 is the footfall; the foot slides back through the stance, then swings forward lifting; returns [dx, lift 0..1, sliding] */
+function step(ph, st) {
+  var u = frac(ph);
+  if (u < st) return [0.5 - u / st, 0];
+  var v = (u - st) / (1 - st);
+  return [-0.5 + ease(v), Math.pow(Math.sin(PI * v), 1.2)];
+}
+/* the foreleg: shoulder S to the paw at P. dang folds the paw under (a lifted foot hangs from the wrist) */
+function foreLeg(p, S, P, dang, fill, w, stripes) {
+  var Wr = [P[0] - 1.5, P[1] - 8], E = ik2(S, Wr, 19, 15, 1), Hl = rot(Wr, [Wr[0] - 0.5, Wr[1] + 6], dang), T = rot(Wr, [Wr[0] + 4.6, Wr[1] + 6.6], dang);
+  var l = limb(p, [S, E, Wr, Hl, T], [21, 12.5, 8, 9, 7.8], fill, w, stripes ? function () {
+    wedge(p, [S[0] - 11, S[1] - 7], [S[0] - 4, S[1] - 6], [S[0] + 3, S[1] - 1], 3.8, {}); wedge(p, [S[0] - 11, S[1] + 3], [S[0] - 5, S[1] + 3.5], [S[0] + 1, S[1] + 7], 3.4, {});
+  } : null);
+  if (stripes) { bar(p, l, 0.5, 0.62, 2.8); bar(p, l, 0.64, 0.6, 2.3); }
+  return l;
+}
+/* the hind leg: hip to the paw at P, the knee forward, the hock back */
+function hindLeg(p, Hp, P, dang, fill, w, stripes) {
+  var Hk = [P[0] - 5.5, P[1] - 13], Q = rot(Hk, [P[0] - 2, P[1] - 1.5], dang), T = rot(Hk, [P[0] + 4.2, P[1] - 0.9], dang), K = ik2(Hp, Hk, 20, 20, -1);
+  var l = limb(p, [Hp, K, Hk, Q, T], [25, 13.5, 8.6, 8.8, 7.8], fill, w, stripes ? function () {
+    wedge(p, [Hp[0] - 15, Hp[1] - 10], [Hp[0] - 7, Hp[1] - 10], [Hp[0] + 3, Hp[1] - 5], 4.2, {}); wedge(p, [Hp[0] - 16, Hp[1] - 1], [Hp[0] - 7, Hp[1] - 1.5], [Hp[0] + 3, Hp[1] + 3], 4, {});
+    wedge(p, [Hp[0] - 14, Hp[1] + 8], [Hp[0] - 6, Hp[1] + 6.5], [Hp[0] + 2, Hp[1] + 9], 3.4, {});
+  } : null);
+  if (stripes) { bar(p, l, 0.66, 0.62, 2.6); bar(p, l, 0.8, 0.6, 2.2); }
+  return l;
+}
+/* the torso in its own frame: the hip joint at (0, 0), the shoulder joint at (L, 0), the back at y = -19; bk sags the back,
+   h1 and h2 are the shoulder blades rising, nt and nb the top and bottom of the neck where the head meets it */
+function torso(p, o) {
+  var L = o.L, h1 = o.h1 || 0, h2 = o.h2 || 0, bk = o.bk || 0, nt = o.nt, nb = o.nb, d;
+  d = 'M-17 -1 C-18 -12 -10 -19 0 -19.5 C10 ' + (-19 + bk) + ' 19 ' + (-18 + bk) + ' ' + (L - 18) + ' ' + (-19.5 - h1) + ' C' + (L - 10) + ' ' + (-21 - h1) + ' ' + (L - 4) + ' ' + (-23.5 - h2) + ' ' + (L + 3) + ' ' + (-22 - h2) +
+    ' C' + (L + 12) + ' ' + (-20.5 - h2) + ' ' + (nt[0] - 10) + ' ' + (nt[1] - 2) + ' ' + nt[0] + ' ' + nt[1] + ' L' + nb[0] + ' ' + nb[1] +
+    ' C' + (nb[0] - 5) + ' ' + (nb[1] + 5) + ' ' + (L + 20) + ' 13 ' + (L + 9) + ' 17 C' + (L + 2) + ' 20 ' + (L - 8) + ' 17 ' + (L - 16) + ' 14 C' + (L - 26) + ' 12 16 11 6 13 C-2 14 -13 11 -17 -1 Z';
+  p.path(d, { fill: COAT, line: false });
+  p.clip(d, function () {
+    var xs = [-13, -5, 3, 11, 19, 27, 35, 43, 51], i, a, ln, ls = [11, 15, 20, 17, 21, 18, 20, 17, 13];
+    for (i = 0; i < xs.length; i++) { ln = ls[i] + (i % 2 ? 2 : 0); a = [xs[i], -26]; wedge(p, a, [xs[i] + (i < 3 ? -1.5 : 1.2), -26 + ln * 0.62], [xs[i] + (i < 3 ? -2 : 3) , -26 + ln * 1.45], 4.6 - 0.12 * i + (i === 3 ? 0.6 : 0), {}); }
+    wedge(p, [-4, -4], [-10, 1], [-17, 4], 3, {}); wedge(p, [-17, 6], [-12, 8], [-8, 6], 2.4, {});
+    p.path('M' + (nb[0] + 4) + ' ' + (nb[1] - 4) + ' C' + (L + 22) + ' 0 ' + (L + 6) + ' 6 ' + (L - 12) + ' 7.5 C' + (L - 24) + ' 8 8 6 -18 1 L-30 1 L-30 40 L' + (L + 40) + ' 40 L' + (L + 40) + ' ' + (nb[1] - 4) + ' Z', { fill: 'white', line: false });
+  });
+  p.path(d, { w: 1.12 });
+}
+/* a ringed tail along four points; the black tip comes last. returns nothing */
+function tail(p, a, b, c, dd, wb, wt) {
+  var sp = bez(a, b, c, dd, 20), wf = function (s) { return lerp(wb, wt, s); }, i, LR;
+  tube(p, sp, wf, { fill: COAT, w: 1.05 });
+  [[0.14, 0.21], [0.28, 0.35], [0.42, 0.49], [0.56, 0.63], [0.7, 0.77], [0.88, 1]].forEach(function (q) {
+    var i0 = Math.round(q[0] * 20), i1 = Math.round(q[1] * 20);
+    LR = edges(sp, wf, i0, i1);
+    var poly = LR[0].concat(q[1] >= 1 ? roundEnd(sp[20], LR[0][LR[0].length - 1], wf(1) / 2) : [], LR[1].reverse());
+    p.curve(poly, { fill: DARK, line: false, close: true });
+  });
+}
+
+
+function toLoc(O, a, w) { var cs = Math.cos(-a), sn = Math.sin(-a), dx = w[0] - O[0], dy = w[1] - O[1]; return [dx * cs - dy * sn, dx * sn + dy * cs]; }
+/* tufts of grass sliding under the feet, k a number of them, g how far the ground has gone in strides */
+function grass(p, g, y, x0, x1, gap) {
+  var k, x, sc;
+  for (k = -1; k < Math.ceil((x1 - x0) / gap) + 2; k++) {
+    x = x0 + gap * (k - frac(g)); sc = clamp(Math.min(x - x0, x1 - x) / 8, 0, 1); if (sc < 0.05) continue;
+    [-1, 0, 1].forEach(function (d) { p.path('M' + (x + d * 1.5) + ' ' + y + ' q' + (d * 1.2) + ' ' + (-3 * sc) + ' ' + (d * 3.6) + ' ' + (-6.5 * sc), { w: 0.7, ink: 'leaf', cap: 'round' }); });
+  }
+}
+/* the whole tiger in profile from a pose: o.S, o.H shoulder and hip joints; o.nf, ff, nh, fh the paws (near, far; fore, hind) and
+   o.dnf, dff, dnh, dfh how far each paw hangs from its wrist; o.eye, hr, hk the head's eye, tilt and scale; o.head its own options; o.tail four points + widths */
+function tigerSide(p, o) {
+  var S0 = o.S, H0 = o.H, tilt = Math.atan2(S0[1] - H0[1], S0[0] - H0[0]), L = Math.hypot(S0[0] - H0[0], S0[1] - H0[1]), eye = o.eye, hr = o.hr, hk = o.hk;
+  var NT = toLoc(H0, tilt, [eye[0] + hk * (-18 * Math.cos(hr) + 17 * Math.sin(hr)), eye[1] + hk * (-18 * Math.sin(hr) - 17 * Math.cos(hr))]);
+  var NB = toLoc(H0, tilt, [eye[0] + hk * (-5 * Math.cos(hr) - 19 * Math.sin(hr)), eye[1] + hk * (-5 * Math.sin(hr) + 19 * Math.cos(hr))]);
+  hindLeg(p, [H0[0] + 3, H0[1] + 1], o.fh, o.dfh, FAR, 0.95, false); foreLeg(p, [S0[0] + 2, S0[1] + 1], o.ff, o.dff, FAR, 0.95, false);
+  var T = o.tail; tail(p, T[0], T[1], T[2], T[3], T[4], T[5]);
+  p.at(H0[0], H0[1], tilt, 1, function () { torso(p, { L: L, h1: o.h1, h2: o.h2, bk: o.bk, nt: NT, nb: NB }); });
+  hindLeg(p, H0, o.nh, o.dnh, COAT, 1.05, true);
+  if (!o.nfLast) foreLeg(p, S0, o.nf, o.dnf, COAT, 1.05, true);
+  p.at(eye[0], eye[1], hr, hk, function () { headSide(p, o.head); });
+  if (o.nfLast) foreLeg(p, S0, o.nf, o.dnf, COAT, 1.05, true);
+}
+/* a value along a list of key poses (flat arrays) at q: smooth through every key, no stop at each */
+function track(times, keys, q) {
+  var n = times.length, i = 0, out = [], j, u, t0, t1, m0, m1, h, k;
+  while (i < n - 2 && q > times[i + 1]) i++;
+  t0 = times[i]; t1 = times[i + 1]; h = t1 - t0; u = clamp((q - t0) / h, 0, 1);
+  for (j = 0; j < keys[0].length; j++) {
+    m0 = i === 0 ? 0 : (keys[i + 1][j] - keys[i - 1][j]) / (times[i + 1] - times[i - 1]) * h;
+    m1 = i + 2 >= n ? 0 : (keys[i + 2][j] - keys[i][j]) / (times[i + 2] - times[i]) * h;
+    k = u * u; out.push((2 * k * u - 3 * k + 1) * keys[i][j] + (k * u - 2 * k + u) * m0 + (-2 * k * u + 3 * k) * keys[i + 1][j] + (k * u - k) * m1);
+  }
+  return out;
+}
+/* the slow walk of a tiger that has seen something: low, the shoulder blades rolling one after the other, the head down,
+   the tail swinging with its black tip arriving last. Tap: it freezes with a forepaw held up, pupils wide, ears forward, only the tail tip twitching. */
+D.add('tiger-stalk', {
+  fam: 'tiger', ratio: 1.4, tags: ['tiger', 'stalk', 'prowl', 'walk', 'hunt', 'big cat', 'creep', 'stealth', 'jungle', 'predator', 'เสือ', 'ย่อง'], loop: 1.8, still: 0.1, tapLen: 2.1176, tapRest: 0.5,
+  burst: false, margin: [10, 10, 4, 8],
+  about: 'walks low, the shoulder blades rolling one after the other, the tail swaying with its black tip arriving last', tapAbout: 'freezes with a forepaw held up, the pupils wide, the ears forward; only the tail tip twitches',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, f = tap ? ease(seg(q, 0, 0.15)) * (1 - ease(seg(q, 0.85, 1))) : 0, i, F = 0;
+    for (i = 0; i < 40; i++) if (tap && i / 40 < q) F += (ease(seg(i / 40, 0, 0.15)) * (1 - ease(seg(i / 40, 0.85, 1)))) / 40;
+    var g = t - F * 2.1176 / 1.8, G0 = 22 / 0.7, st = 0.7, SL = 22, GY = 89.1;
+    var bob = 1.1 * W(t, 2, 0.08) * (1 - f) + 2.2 * f, S0 = [86, 50 + bob + 1.5 * f], H0 = [40, 56 + bob + 1.5 * f];
+    var fp = { nh: step(t - 0.0, st), nf: step(t - 0.25, st), fh: step(t - 0.5, st), ff: step(t - 0.75, st) }, lift = 9.5;
+    var hp = function (a, c, hold) { return [lerp(c + SL * a[0], hold[0], f), lerp(GY - lift * a[1], hold[1], f)]; };
+    var s1 = W(t, 1, -0.1), s2 = W(t, 1, -0.22), s3 = W(t, 1, -0.36), tw = tap ? Math.sin(TAU * 3 * q) * bump(seg(q, 0.15, 0.85)) : 0, ty = 5 * f;
+    p.line(2, 92.6, 138, 92.6, { w: 0.5, detail: true });
+    grass(p, g, 92.4, 4, 136, G0);
+    tigerSide(p, {
+      S: S0, H: H0, nh: hp(fp.nh, H0[0] + 7, [H0[0] + 3, GY]), nf: hp(fp.nf, S0[0] + 4, [S0[0] + 24, GY - 12]), nfLast: f > 0.35, fh: hp(fp.fh, H0[0] + 7, [H0[0] + 12, GY]), ff: hp(fp.ff, S0[0] + 4, [S0[0] - 3, GY]),
+      dnh: 0.85 * fp.nh[1] * (1 - f), dnf: lerp(0.85 * fp.nf[1], 0.5, f), dfh: 0.85 * fp.fh[1] * (1 - f), dff: 0.85 * fp.ff[1] * (1 - f),
+      h1: 2.6 * (0.5 - fp.nf[0]) * (1 - f) + 0.8 * f, h2: 2.6 * (0.5 - fp.ff[0]) * (1 - f), bk: 1.6 * (fp.nh[0] + fp.fh[0]),
+      eye: [S0[0] + 28, S0[1] + 6 + 1.2 * W(t, 2, 0.2) * (1 - f) + 2 * f], hr: 0.1 + 0.07 * f - 0.03 * W(t, 2, 0.2) * (1 - f), hk: 0.64,
+      head: { open: 0.02, ear: -0.1 - 0.35 * f, lid: pulse(t, 0.7, 0.08) * (1 - f), pupil: 1 + 0.5 * f, t: t },
+      tail: [[H0[0] - 13, H0[1] - 6], [14 + 2 * s1, 56 + ty + 2.5 * s1], [3 + 2 * s2, 68 + ty + 3 * s2], [7 + 3 * s3 + 2 * tw, 58 + ty + 5 * s3 - 3 * f - 3 * tw], 8.2, 4.8]
+    });
+  }
+});
+
+/* the crouch before the pounce, and the pounce: key poses as flat lists
+   S hip... see POUNCE_NAMES; x, y of S, H, then the four paws, four paw hangs, eye x y tilt, mouth, ears, three tail points (x y each) */
+var GY = 89.1;
+var POUNCE_T = [0, 0.17, 0.37, 0.53, 0.63, 1];
+var POUNCE_K = [
+  /*      Sx  Sy  Hx  Hy   nfx nfy   ffx ffy   nhx nhy   fhx fhy   dnf dff dnh dfh   ex  ey   er   op   ear   bx by   cx cy   dx dy */
+  [72, 64, 30, 54, 98, GY, 92, GY, 30, GY, 38, GY, 0.2, 0.2, 0.1, 0.1, 94, 72, 0.1, 0, -0.05, 15, 58, 5, 68, 8, 58],
+  [67, 71, 26, 63, 95, GY, 89, GY, 27, GY, 35, GY, 0.2, 0.2, 0.1, 0.1, 89, 78, 0.2, 0, -0.1, 12, 64, 3, 73, 3, 66],
+  [97, 36, 51, 44, 121, 66, 112, 69, 22, 58, 31, 63, 0.5, 0.5, 0.9, 0.9, 124, 39, -0.12, 0.35, -0.5, 36, 46, 22, 47, 8, 42],
+  [101, 60, 53, 46, 124, GY, 118, GY, 33, 65, 41, 68, 0.1, 0.1, 0.8, 0.8, 128, 67, 0.42, 0.15, -0.35, 28, 44, 12, 42, 3, 34],
+  [98, 67, 46, 59, 123, GY, 117, GY, 39, GY, 47, GY, 0, 0, 0.1, 0.1, 124, 75, 0.35, 0, -0.1, 20, 56, 6, 60, 6, 48],
+  [72, 64, 30, 54, 98, GY, 92, GY, 30, GY, 38, GY, 0.2, 0.2, 0.1, 0.1, 94, 72, 0.1, 0, -0.05, 15, 58, 5, 68, 8, 58]
+];
+/* a tuft of tall grass, the prey's cover: blades lean by bend (negative leans left under a paw), sway on their own */
+function tuft(p, x, y, t, bend, hide) {
+  var i, hs = [17, 21, 24, 20, 15, 22, 18], xs = [-6, -4, -2, 0.5, 3, 5.5, 8], sw;
+  for (i = 0; i < 7; i++) {
+    sw = 1.8 * W(t, 2, i * 0.09) * (1 - Math.abs(bend)) + bend * 17;
+    p.path('M' + (x + xs[i]) + ' ' + y + ' C' + (x + xs[i] + sw * 0.1) + ' ' + (y - hs[i] * 0.4) + ' ' + (x + xs[i] + sw * 0.5 + xs[i] * 0.2) + ' ' + (y - hs[i] * 0.75 * (1 - 0.5 * Math.abs(bend))) + ' ' + (x + xs[i] + sw + xs[i] * 0.3) + ' ' + (y - hs[i] * (1 - 0.7 * Math.abs(bend))), { w: 0.85, ink: i % 2 ? 'green' : 'leaf', cap: 'round' });
+  }
+}
+/* the pounce: a crouch with the rump wiggling, the eyes fixed on a tuft of grass, the tail tip lashing.
+   Tap: it coils, leaps with the hind legs trailing, lands on the grass with the forepaws, the body squashing and the dust and leaves flying, and backs out. */
+D.add('tiger-pounce', {
+  fam: 'tiger', ratio: 1.4, tags: ['tiger', 'pounce', 'leap', 'jump', 'crouch', 'wiggle', 'hunt', 'big cat', 'play', 'jungle', 'เสือ', 'กระโจน'], loop: 2.4, still: 0.05, tapLen: 2.2, tapRest: 0.0,
+  burst: 'leaf', burstAt: [130, 80], burstN: 5, burstSpread: 1.3, burstDelay: 0.5, burstGravity: 60, margin: [12, 14, 4, 8], tapMargin: [30, 30, 4, 10],
+  about: 'crouched low, the rump wiggling, the tail tip lashing, the eyes locked on a tuft of grass', tapAbout: 'coils, leaps with the hind legs trailing, lands forepaws first on the grass with a squash, dust and leaves flying, then backs out',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, v = track(POUNCE_T, POUNCE_K, tap ? q : 0), i;
+    var env = bump(seg(t, 0.1, 0.9)), wg = W(t, 6, 0.0) * env, wg2 = W(t, 6, 0.25) * env, quiet = tap ? 0 : 1, rest = tap ? 0 : 1;
+    var wig = tap ? 1.4 * W(q, 8) * (1 - seg(q, 0.12, 0.2)) * seg(q, 0.0, 0.05) : 0;
+    var S0 = [v[0], v[1]], H0 = [v[2] + 1.0 * wg2 * rest + wig, v[3] - 1.6 * wg * rest + 1.2 * wig], air = clamp((62 - (v[1] + v[3]) / 2) / 24, 0, 1), sq = tap ? bump(seg(q, 0.5, 0.74)) : 0;
+    var tread = function (ph) { return 2.6 * Math.max(0, W(t, 6, ph)) * env * rest; };
+    var feet = function (x, y, extra) { return [x, Math.min(GY, y - extra)]; };
+    var tw = W(t, 3, -0.15), tw2 = W(t, 3, -0.3), tw3 = W(t, 3, -0.45), tl = tap ? 0 : 1;
+    p.line(2, 92.6, 138, 92.6, { w: 0.5, detail: true });
+    p.ellipse((S0[0] + H0[0]) / 2 - 4, 92.4, 36 * (1 - 0.45 * air), 2.2, { fill: 'smoke', line: false, alpha: 0.7 * (1 - 0.5 * air) });
+    var crush = tap ? ease(seg(q, 0.52, 0.58)) * (1 - ease(seg(q, 0.78, 0.97))) : 0, pop = tap ? sp(seg(q, 0.82, 1)) * seg(q, 0.78, 0.8) : 0;
+    tuft(p, 131, 92.2, t, -crush + 0.0 * pop, 0);
+    var gaze = tap ? 0 : 0.5 * W(t, 1, 0.1);
+    tigerSide(p, {
+      S: S0, H: H0, nf: [v[4], v[5]], ff: [v[6], v[7]], nh: feet(v[8], v[9], tread(0)), fh: feet(v[10], v[11], tread(0.5)),
+      dnf: v[12], dff: v[13], dnh: v[14] + (tread(0) > 0 ? 0.5 : 0), dfh: v[15] + (tread(0.5) > 0 ? 0.5 : 0),
+      h1: 1.2 + 1.5 * sq, h2: 0.4 + 1.5 * sq, bk: -1.2 + 2.5 * air - 1.8 * sq,
+      eye: [v[16], v[17] + 0.5 * W(t, 6, 0.1) * env * rest], hr: v[18], hk: 0.64,
+      head: { open: v[19], ear: v[20] + 0.1 * pulse(t, 0.3, 0.1) * rest, lid: pulse(t, 0.62, 0.08) * rest, pupil: 1.35 - 0.3 * air, t: t, snarl: v[19] > 0.2 ? 0.5 : 0, wv: 0 },
+      tail: [[H0[0] - 13, H0[1] - 6], [v[21] + 1.5 * tw * rest, v[22] - 4 * tw * tl * env], [v[23] + 2 * tw2 * rest, v[24] - 7 * tw2 * tl * env], [v[25] + 3 * tw3 * rest, v[26] - 11 * tw3 * tl * env - 6 * tl], 8.2, 4.8]
+    });
+    /* dust off the forepaws where they land */
+    if (tap) for (i = 0; i < 3; i++) {
+      var u = seg(q, 0.53 + i * 0.03, 0.8);
+      if (u > 0 && u < 1) p.circle(112 - 14 * u * (i + 1) * 0.6 - i * 4, 88 - 7 * u - i * 1.5, 5.5 * Math.sin(Math.PI * Math.pow(u, 0.7)) + 0.4, { fill: 'smoke', w: 0.6, alpha: 0.9 });
+    }
+  }
+});
+
+/* a leaf drifting down, turning as it goes: u runs 0 → 1 */
+function leaf(p, x, y, a, k) { p.at(x, y, a, k, function () { p.path('M0 -6 C4 -4 4 3 0 7 C-4 3 -4 -4 0 -6 Z', { fill: 'leaf', w: 0.7 }); p.line(0, -5, 0, 5, { w: 0.4, detail: true }); }); }
+/* a Z that is drawn, sits a moment, and is taken back; ph 0 → 1 */
+function zed(p, x, y, r, ph) {
+  var d = 'M' + (x - r) + ' ' + (y - r) + ' L' + (x + r) + ' ' + (y - r) + ' L' + (x - r) + ' ' + (y + r) + ' L' + (x + r) + ' ' + (y + r);
+  p.span(d, ei(seg(ph, 0.55, 1)), eo(seg(ph, 0, 0.4)), { w: 0.8, cap: 'round' });
+}
+/* asleep, curled up on the ground: the back rising and falling with each breath, the tail tip flicking, an ear twitching, zzz.
+   Tap: one eye opens a slit, the pupil finds you, an ear swivels round, and it shuts again with a long breath out. */
+D.add('tiger-nap', {
+  fam: 'tiger', ratio: 1.2, tags: ['tiger', 'nap', 'sleep', 'asleep', 'curled', 'rest', 'zzz', 'cozy', 'lazy', 'big cat', 'night', 'เสือ', 'นอน', 'หลับ'], loop: 3.2, still: 0.15, tapLen: 2.2, tapRest: 0.35,
+  burst: false, margin: [26, 12, 4, 6],
+  about: 'the back rises and falls with each breath, the tail tip flicks, an ear twitches, the zzz drift up', tapAbout: 'one eye opens a slit and finds you, an ear swivels round, then it shuts again with a long breath out',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, br = W(t, 2, 0.1), i;
+    var wake = tap ? ease(seg(q, 0.08, 0.3)) * (1 - ease(seg(q, 0.62, 0.84))) : 0, sigh = tap ? bump(seg(q, 0.78, 1)) : 0;
+    var flick = Math.max(pulse(t, 0.2, 0.14), pulse(t, 0.34, 0.12) * 0.8) * (1 - 0.7 * wake) + (tap ? 0.9 * bump(seg(q, 0.3, 0.7)) * Math.sin(TAU * 3 * q) * 0.5 : 0);
+    var chest = 1 + 0.028 * br + 0.04 * sigh * 0 - 0.03 * sigh;
+    var GYn = 89, eye = [90, 66 + 0.8 * br], ear = 0.28 * pulse(t, 0.62, 0.1) - 0.5 * wake, i2;
+    p.line(2, 90.4, 118, 90.4, { w: 0.5, detail: true });
+    /* the tail lies along the ground in front of the belly, its tip flicking up */
+    var tipUp = 11 * flick;
+    /* the body */
+    p.pivot(52, 90, 0, [1, chest], function () {
+      var body = 'M15 85 C4 76 7 54 21 42 C33 31 58 27 76 33 C89 37 97 48 98 60 C100 70 97 80 93 87 C74 91 38 91 15 85 Z';
+      p.path(body, { fill: COAT, line: false });
+      p.clip(body, function () {
+        [[18, 30, 11, -1.4], [27, 28, 15, -1], [36, 26, 22, -0.5], [46, 25, 24, 0], [56, 25, 24, 0.5], [66, 26, 24, 1], [76, 29, 20, 1.5], [86, 36, 16, 2]].forEach(function (c, k) {
+          var lean = c[3] * 3.4; wedge(p, [c[0], c[1]], [c[0] + lean * 0.4, c[1] + c[2] * 0.55], [c[0] + lean, c[1] + c[2] * 1.7], 4.8 - 0.1 * k, {});
+        });
+        p.path('M5 80 C30 70 70 74 110 70 L110 100 L0 100 Z', { fill: 'white', line: false });
+      });
+      p.path(body, { w: 1.12 });
+      /* the haunch, with the hind paw tucked under */
+      p.path('M22 70 C20 54 36 46 48 52 C58 57 60 72 54 82 C50 88 36 90 28 86 C24 82 22 76 22 70 Z', { fill: COAT, w: 1.05 });
+      p.clip('M22 70 C20 54 36 46 48 52 C58 57 60 72 54 82 C50 88 36 90 28 86 C24 82 22 76 22 70 Z', function () {
+        wedge(p, [18, 52], [26, 53], [36, 58], 4.6, {}); wedge(p, [17, 63], [26, 63], [36, 66], 4.4, {}); wedge(p, [19, 74], [27, 73], [35, 75], 4, {});
+      });
+      p.path('M38 58 C47 58 53 66 51 77', { w: 0.45, detail: true });
+      p.path('M43 83 C52 80 62 83 63 87 C58 90 46 90 43 87 Z', { fill: 'cream', w: 0.9 });
+    });
+    tail(p, [13, 70], [1, 86], [30, 97], [76 + 2 * flick, 89 - tipUp], 8.2, 5);
+    /* forelegs lying forward under the head */
+    limb(p, [[86, 66], [92, 80], [102, 85], [108, 86], [114, 86.4]], [16, 11, 9, 9.4, 8.4], FAR, 0.95, null);
+    var fl = limb(p, [[80, 62], [86, 78], [95, 85], [103, 86], [110, 86.6]], [20, 12.5, 9.5, 10, 8.6], COAT, 1.05, function () { wedge(p, [70, 62], [76, 62], [84, 66], 4, {}); });
+    bar(p, fl, 0.45, 0.6, 2.8); bar(p, fl, 0.6, 0.6, 2.4);
+    /* the head, resting on its paws */
+    p.at(eye[0], eye[1], 0.1 - 0.05 * wake - 0.04 * sigh, 0.7, function () {
+      headSide(p, { open: 0, ear: ear, lid: 1 - wake, sleep: false, pupil: 1.2, t: t, wv: 0, flare: 0 });
+    });
+    /* zzz */
+    for (i = 0; i < 3; i++) { var ph = frac(t - 0.3 * i + 0.9); zed(p, 108 + 3 * i, 40 - 9 * i, 2.2 + 1.1 * i, wake > 0.3 ? 1 : ph); }
+  }
+});
+
+/* a butterfly: two pairs of wings flapping about the body, k its size */
+function butterfly(p, x, y, rot, flap, k) {
+  p.at(x, y, rot, k, function () {
+    [-1, 1].forEach(function (d) {
+      p.pivot(0, 0, 0, [d * flap, 1], function () {
+        p.path('M0 -1 C-2 -9 -12 -12 -12.5 -4 C-12.5 1 -5 2.4 0 0 Z', { fill: 'lilac', w: 0.8 });
+        p.path('M0 1 C-3 2 -10 3 -9 8 C-8 12 -2 9 0 3 Z', { fill: 'sky', w: 0.8 });
+        p.dot(-8.2, -4.4, 1.7, 'plum');
+      });
+    });
+    p.ellipse(0, 1, 1.2, 5, { fill: DARK, w: 0.5 });
+    p.path('M0 -4 C-1 -8 -3 -9 -4 -10 M0 -4 C1 -8 3 -9 4 -10', { w: 0.45, detail: true });
+  });
+}
+/* a cub's paw: cream, with its toes */
+function cubPaw(p, x, y, kick) {
+  p.pivot(x, y - 4, kick, 1, function () {
+    p.ellipse(x, y, 6.8, 4.8, { fill: 'cream', w: 0.95 });
+    p.path('M' + (x - 2.2) + ' ' + (y - 0.4) + ' L' + (x - 2.2) + ' ' + (y + 3.6) + ' M' + (x + 2.2) + ' ' + (y - 0.4) + ' L' + (x + 2.2) + ' ' + (y + 3.6), { w: 0.4, detail: true });
+  });
+}
+/* the cub, from its centre (0, 0): head tilt, the batting arm's angle, the hind paws' kick, tail sway; look and lid for the eyes */
+function cub(p, t, o) {
+  var i;
+  tail(p, [13, 21], [26, 25], [33, 14], [27 + 3 * o.tw, 4 - 1 * o.tw], 6.8, 5.4);
+  [-1, 1].forEach(function (d) { cubPaw(p, d * 19, 24, d * -0.1 + (d > 0 ? o.kick : -o.kick)); });
+  var body = 'M-15 -9 C-22 2 -25 17 -19 25 C-10 29 10 29 19 25 C25 17 22 2 15 -9 Z';
+  p.path(body, { fill: COAT, line: false });
+  p.clip(body, function () {
+    p.ellipse(0, 14, 9.4, 14, { fill: 'white', line: false });
+    [[0, 0], [10, 0], [19, 0]].forEach(function (c) { [-1, 1].forEach(function (d) { wedge(p, [d * 26, c[0]], [d * 19, c[0] - 0.5], [d * 13, c[0] + 2.5], 4.2, {}); }); });
+  });
+  p.path(body, { w: 1.1 });
+  limb(p, [[-9, -6], [-10, 8], [-9, 19]], [12, 9.6, 9.4], COAT, 1, null); cubPaw(p, -9, 21, 0);
+  p.pivot(11, -6, o.arm, 1, function () { limb(p, [[11, -6], [12, 8], [11, 18]], [12, 9.6, 9.4], COAT, 1, null); wedge(p, [6, 4], [9, 4.5], [12, 6.5], 2.6, {}); cubPaw(p, 11, 20, 0); });
+  p.at(0, -30, o.tilt, 0.58, function () {
+    p.move(-50, -52);
+    faceFront(p, t, { op: o.op, lid: o.lid, happy: o.happy, look: o.look, ly: o.ly, earL: o.earL, earR: o.earR, cub: 1, pupil: o.pupil });
+  });
+}
+/* a cub sits and bats at a butterfly, the head following it, the swats always a hair behind it, the tail curling.
+   Tap: it reaches too far and topples over onto its back, paws kicking; the butterfly lands on its nose and it goes cross-eyed, then rolls back up. */
+D.add('tiger-cub', {
+  fam: 'tiger', ratio: 1.1, tags: ['tiger', 'cub', 'baby', 'kitten', 'butterfly', 'play', 'cute', 'tumble', 'young', 'big cat', 'เสือน้อย', 'ลูกเสือ'], loop: 2.6, still: 0.5, tapLen: 3, tapRest: 0.5,
+  burst: false, margin: [10, 12, 4, 10], tapMargin: [14, 14, 4, 12],
+  about: 'sits batting at a butterfly, the head following it, the tail curling', tapAbout: 'reaches too far and topples over, paws kicking; the butterfly lands on its nose, it goes cross-eyed, then rolls back up',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, C = [55, 66], i;
+    var bx = 84 + 12 * W(t, 1), by = 36 + 9 * W(t, 2, 0.2), flap = 0.3 + 0.7 * Math.abs(W(t, 8)), rot = 0.3 * W(t, 1, 0.25);
+    var swat = Math.max(pulse(t, 0.44, 0.17), pulse(t, 0.94, 0.17)), reach = tap ? bump(seg(q, 0, 0.24)) : 0;
+    var lying = tap ? ei(seg(q, 0.16, 0.36)) * (1 - ease(seg(q, 0.78, 0.95))) : 0, bounce = tap ? 0.12 * bump(seg(q, 0.36, 0.5)) : 0, wob = tap ? 0.09 * Math.sin(TAU * 2.5 * seg(q, 0, 0.2)) * (1 - seg(q, 0.12, 0.2)) : 0;
+    var th = -1.5 * lying + bounce + wob, dy = 12 * lying - 2.5 * reach, att = tap ? ease(seg(q, 0.4, 0.52)) * (1 - ease(seg(q, 0.74, 0.86))) : 0;
+    var arm = lerp(-0.5, -2.1, swat) - 0.4 * reach + (tap ? -0.3 * Math.sin(TAU * 3 * q) * lying : 0);
+    var look = lerp((bx - 84) / 14 * 0.9, 0.9, att), lookR = lerp((bx - 84) / 14 * 0.9, -0.9, att), ly = lerp(-0.6 + (by - 36) / 9 * 0.5, 0.8, att);
+    var tilt = lerp(0.016 * (bx - 84) - 0.05 * swat, 0, att), op = tap ? 0.25 * bump(seg(q, 0.12, 0.34)) : 0, kick = lying * 0.5 * Math.sin(TAU * 3 * t);
+    var nose = [C[0] + 27 * Math.sin(th), C[1] + dy - 27 * Math.cos(th)];
+    p.line(2, 92.4, 108, 92.4, { w: 0.5, detail: true });
+    var onTop = att < 0.5;
+    var bpos = [lerp(bx, nose[0], att), lerp(by, nose[1], att)];
+    if (onTop) butterfly(p, bpos[0], bpos[1], lerp(rot, 0, att), lerp(flap, 0.3 + 0.7 * Math.abs(W(t, 4)), att), 1);
+    p.at(C[0], C[1] + dy, th, [1 + 0.02 * W(t, 3) * (1 - lying), 1 - 0.02 * W(t, 3) * (1 - lying)], function () {
+      cub(p, t, { tilt: tilt, arm: arm, kick: kick, tw: W(t, 1, -0.2), look: [look, lookR], ly: ly, op: op, lid: tap ? 0 : pulse(t, 0.7, 0.06), earL: 0.15 * pulse(t, 0.2, 0.1), earR: 0.1 * pulse(t, 0.26, 0.1) + 0.2 * att, happy: 0, pupil: 1 + 0.4 * att + 0.3 * reach });
+    });
+    if (!onTop) butterfly(p, bpos[0], bpos[1], rot * (1 - att), 0.3 + 0.7 * Math.abs(W(t, 4)) * 0.8, 1);
+    if (tap && lying > 0.8) for (i = 0; i < 3; i++) { var u = seg(q, 0.36 + i * 0.03, 0.62); if (u > 0 && u < 1) p.circle(30 + i * 28 + (i - 1) * 8 * u, 90 - 4 * u, 4.4 * Math.sin(Math.PI * Math.pow(u, 0.7)) + 0.3, { fill: 'smoke', w: 0.6 }); }
+  }
+});
+
+/* ---------------------------------------------------------------------------------------------
+   เสือคู่ suea koo, the twin tigers of the sak yant: two tigers rearing to face each other, drawn in ink as a yant is
+   --------------------------------------------------------------------------------------------- */
+/* how long a stroke is, roughly: through its numbers taken as points */
+function lenOf(d) {
+  var a = typeof d === 'string' ? (d.match(/-?\d+\.?\d*/g) || []).map(Number) : [].concat.apply([], d), n = 0, i;
+  for (i = 2; i + 1 < a.length; i += 2) n += Math.hypot(a[i] - a[i - 2], a[i + 1] - a[i - 1]);
+  return n;
+}
+/* the strokes of the left tiger, in the order the hand makes them: f 0 in the box, f 1 on the head (the face of tiger-face,
+   100 x 100, set at the top of the body); det strokes are left out when small */
+var YANT = (function () {
+  var L = [], tot = 0, c = 0, sp, LR, n, cap, wd;
+  function add(d, w, f, o) { L.push(Object.assign({ d: d, w: w, f: f || 0 }, o || {})); }
+  function mir(a) { return a.map(function (q) { return [100 - q[0], q[1]]; }); }
+  function pair(a, w, o) { add(a, w, 1, Object.assign({ smooth: true }, o || {})); add(mir(a), w, 1, Object.assign({ smooth: true }, o || {})); }
+  /* the heavy back, the haunch and hind leg, the chest */
+  add([[12, 43], [6, 49], [3.8, 59], [5.5, 68], [8, 76]], 1.3, 0, { smooth: true });
+  add([[8, 76], [5, 83], [8, 89], [6.5, 94], [16, 95.2], [28, 94], [26, 90], [25, 85], [28, 80.5], [33, 78]], 1.2, 0, { smooth: true });
+  add([[32, 84], [40, 84], [44, 88], [42, 93], [50, 93]], 1, 0, { smooth: true, det: 1 });
+  add([[46, 48.5], [55, 51.5], [60, 60], [58.5, 69], [52, 76], [43, 80], [35, 80.5]], 1.3, 0, { smooth: true });
+  /* the tail, curling up behind in an S: two edges and rings between them */
+  sp = cr([[8, 76], [2.5, 73], [-0.5, 66], [2.5, 60], [6.5, 55], [5, 49], [1, 44], [0.5, 38], [4, 33]], [7, 6.5, 6, 5.5, 5, 4.6, 4.2, 3.6, 3], 5);
+  n = sp[0].length; wd = function (s) { return sp[1][Math.min(n - 1, Math.round(s * (n - 1)))]; };
+  LR = edges(sp[0], wd, 0, n - 1); cap = roundEnd(sp[0][n - 1], LR[0][n - 1], wd(1) / 2, 8);
+  add(LR[0].concat(cap, LR[1].slice().reverse()), 1.05, 0, { smooth: true });
+  [8, 13, 18, 23, 28, 33].forEach(function (i) { add([LR[0][i], LR[1][i]], 1.1, 0, { det: 1 }); });
+  /* the forelegs raised toward the other tiger, with claws */
+  add([[37, 50], [45, 52], [52, 49], [56, 43]], 1.15, 0, { smooth: true });
+  add([[40, 62], [48, 62.5], [54, 58], [58, 51]], 1.15, 0, { smooth: true });
+  add([[56, 43], [60, 44.5], [58, 51]], 1.05, 0, { smooth: true });
+  add([[60, 44.5], [63.4, 42.6]], 0.95, 0, { det: 1 }); add([[60.6, 47], [64, 47]], 0.95, 0, { det: 1 }); add([[58.8, 50.4], [62.2, 52]], 0.95, 0, { det: 1 });
+  add([[42, 58], [48, 66], [54, 67.5], [58, 63], [60, 58]], 0.9, 0, { smooth: true, det: 1 });
+  add([[46, 52.5], [47, 58.5]], 1.1, 0, { det: 1 }); add([[51, 50], [52, 56.5]], 1.1, 0, { det: 1 });
+  /* the face, as tiger-face has it, in line: ears, ruffs, brow stripes, eyes, nose, mouth */
+  add(faceShape(0, 0), 1.15, 1, {});
+  pair([[12.5, 31], [11.5, 21], [17, 13], [24, 12], [29, 13], [33.5, 17]], 1.1, {});
+  pair([[17, 29], [17, 23], [20, 18], [24, 17], [27, 18]], 0.6, { det: 1 });
+  add([[50, 14.5], [50, 22], [50, 31]], 2.1, 1, { smooth: true }); pair([[39, 14.5], [41.5, 20], [44.4, 28]], 1.8, {}); pair([[21, 21], [25, 25], [30, 29.5]], 1.7, {});
+  pair([[12, 33], [19, 33.5], [26, 36]], 1.7, {}); pair([[9, 41], [17, 40.5], [24, 42]], 1.6, {});
+  add('M27 45 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0', 0.85, 1, {}); add('M61 45 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0', 0.85, 1, {});
+  add([[33.2, 45.2], [33.8, 45.2]], 2.3, 1, { cap: 'round' }); add([[66.2, 45.2], [66.8, 45.2]], 2.3, 1, { cap: 'round' });
+  add('M40.6 45 C39 38.5 31 37.5 26 41.5', 1, 1, {}); add('M59.4 45 C61 38.5 69 37.5 74 41.5', 1, 1, {});
+  add('M42 54.5 C42 51 58 51 58 54.5 C58 58.5 53 62.5 50 63.5 C47 62.5 42 58.5 42 54.5 Z', 1.1, 1, {}); add([[46, 55], [54, 55]], 2.2, 1, { cap: 'round' });
+  add([[50, 63.5], [50, 68.5]], 1, 1, {}); add('M50 68.5 C48 72.5 43 73.5 39.5 70', 1, 1, {}); add('M50 68.5 C52 72.5 57 73.5 60.5 70', 1, 1, {});
+  pair([[9, 57], [16, 57.5], [24, 59.5]], 1.6, {}); pair([[9, 67], [15, 66], [22, 67.5]], 1.5, {});
+  pair([[36, 68], [22, 65.5], [8, 66.5]], 0.5, { det: 1 }); pair([[36, 71], [22, 72], [9, 75]], 0.5, { det: 1 });
+  /* the stripes of the shoulders, chest and haunch, bold, from the edges inward */
+  add([[3.6, 49.5], [10, 52.5], [18, 52.5]], 2.3, 0, { smooth: true }); add([[3.2, 58.5], [9.5, 61], [18, 61]], 2.3, 0, { smooth: true });
+  add([[4.6, 67.5], [11, 69.5], [19, 68.5]], 2.2, 0, { smooth: true }); add([[7, 75], [13, 76.5], [20, 76]], 2, 0, { smooth: true });
+  add([[6.4, 83], [12, 82], [18, 84]], 1.8, 0, { smooth: true }); add([[7, 89], [12.5, 88.5], [17, 90]], 1.6, 0, { smooth: true });
+  add([[59, 58], [53.5, 58.5], [49, 57]], 1.9, 0, { smooth: true }); add([[58, 67], [52.5, 66.5], [48.5, 65.5]], 1.8, 0, { smooth: true }); add([[51.5, 74.5], [47, 73], [43.5, 71.5]], 1.6, 0, { smooth: true });
+  add([[5, 96], [30, 97.4], [64, 96]], 0.8, 0, { smooth: true });
+  L.forEach(function (o) { o.len = lenOf(o.d) * (o.f ? 0.5 : 1); tot += o.len; });
+  L.forEach(function (o) { o.c0 = c / tot; c += o.len; o.c1 = c / tot; });
+  return L;
+})();
+/* the unalome: a spiral that unwinds into a rising line */
+var UNALOME = (function () {
+  var a = [], i, th, r;
+  for (i = 0; i <= 28; i++) { th = i / 28 * PI * 3.5; r = 1.1 + 4.4 * i / 28; a.push([70 + r * Math.cos(th), 62 + r * Math.sin(th)]); }
+  return a.concat([[70, 55.6], [71.6, 49], [68.4, 43], [71.6, 35], [68.4, 29], [71.4, 23], [69.4, 17], [70, 11]]);
+})();
+function yantTiger(p, T, E, lit) {
+  var i, st, u, e, a, b;
+  for (i = 0; i < YANT.length; i++) {
+    st = YANT[i]; if (st.det && p.small) continue;
+    u = seg(T, st.c0, st.c1); e = seg(E, 1 - st.c1, 1 - st.c0);
+    if (u <= e + 0.003) continue;
+    (function (st, u, e) {
+      var draw = function () {
+        if (lit >= 0) { a = clamp((lit - 0.22 - st.c0) / (st.c1 - st.c0), 0, 1); b = Math.min(clamp((lit - st.c0) / (st.c1 - st.c0), 0, 1), u); if (b > a + 0.01 && b > e) p.span(st.d, Math.max(a, e), b, { w: st.w + 1.3, ink: 'gold', glow: 0.8, smooth: st.smooth, alpha: 0.85, cap: st.cap }); }
+        p.span(st.d, e, u, { w: st.w, smooth: st.smooth, ink: 'ink', cap: st.cap });
+      };
+      if (st.f) p.at(34, 28, 0.14, 0.5, function () { p.move(-50, -52); draw(); }); else draw();
+    })(st, u, e);
+  }
+}
+/* two tigers rear up facing each other, drawn stroke by stroke in ink, the left hand a little ahead of the right, then a soft
+   gold glow breathes and the lines are taken back. Tap: both are drawn whole, a light runs along the ink and a ring of light spreads from the unalome. */
+D.add('suea-koo', {
+  fam: 'tiger', ratio: 1.4, tags: ['suea koo', 'twin tigers', 'sak yant', 'yant', 'tattoo', 'tiger', 'protection', 'strength', 'ink', 'unalome', 'blessing', 'เสือคู่', 'สักยันต์', 'ยันต์'], loop: 6, still: 0.7, tapLen: 2.2, tapRest: 0.5,
+  burst: false, margin: [8, 8, 6, 8], tapMargin: [12, 14, 10, 14],
+  about: 'two tigers rearing face to face are drawn in ink line by line, a gold glow breathes round them, and the lines are taken back', tapAbout: 'both tigers are drawn whole, a light runs along their ink and a ring of light spreads from the unalome between them',
+  draw: function (p, t, s) {
+    var tap = s.tap >= 0, q = tap ? s.tap : 0, br = 0.5 + 0.5 * W(t, 2, 0.1), i;
+    var k = tap ? ease(seg(q, 0, 0.12)) * (1 - ease(seg(q, 0.86, 1))) : 0;
+    var T0 = lerp(seg(t, 0.02, 0.46), 1, k), T1 = lerp(seg(t, 0.05, 0.49), 1, k), E0 = lerp(seg(t, 0.86, 0.98), 0, k), E1 = lerp(seg(t, 0.88, 1), 0, k), U = lerp(seg(t, 0.3, 0.48), 1, k), UE = lerp(seg(t, 0.9, 1), 0, k);
+    var glow = bump(seg(t, 0.3, 0.95)) * (0.7 + 0.3 * br), flare = tap ? bump(seg(q, 0, 0.7)) : 0;
+    var lit = tap ? seg(q, 0.12, 0.84) * 1.22 : -1;
+    p.circle(70, 52, 50 + 4 * br, { fill: 'gold', line: false, alpha: 0.12 * Math.max(glow, k) + 0.1 * flare, glow: 1 });
+    p.circle(70, 50, 30 + 3 * br, { fill: 'gold', line: false, alpha: 0.12 * Math.max(glow, k) + 0.12 * flare, glow: 1 });
+    yantTiger(p, T0, E0, lit);
+    p.pivot(70, 0, 0, [-1, 1], function () { yantTiger(p, T1, E1, tap ? Math.max(0, lit - 0.05) : -1); });
+    var ua = lit >= 0 ? clamp((lit - 0.35) / 0.8, 0, 1) : -1;
+    if (ua >= 0 && ua < 1.0) p.span(UNALOME, Math.max(0, ua - 0.3), Math.min(ua, U), { w: 3.4, ink: 'gold', glow: 0.9, smooth: true, alpha: 0.9 });
+    p.span(UNALOME, UE, U, { w: 1.2, smooth: true, ink: 'ink' });
+    if (U > 0.98 && UE < 0.2) p.dot(70, 9.5, 1.5 + 0.5 * br + flare, 'ink');
+    if (tap) for (i = 0; i < 2; i++) p.span('M70 55 m-' + (14 + 22 * i) + ' 0 a' + (14 + 22 * i) + ' ' + (14 + 22 * i) + ' 0 1 0 ' + (28 + 44 * i) + ' 0 a' + (14 + 22 * i) + ' ' + (14 + 22 * i) + ' 0 1 0 -' + (28 + 44 * i) + ' 0', ei(seg(q, 0.45 + i * 0.1, 0.95)), eo(seg(q, 0.18 + i * 0.1, 0.7)), { w: 0.8, ink: 'gold', glow: 0.8 });
+  }
+});
+
+/*@@NEXT*/
 })(Dingbats);
 
 /* Work: the jobs people hand over — a page, a stamp, a translation, a wrench, a laptop, a server, a parcel, a passport. First drawn for hongdam.net's service lines (2026-10-23). */
